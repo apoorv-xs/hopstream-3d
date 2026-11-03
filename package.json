@@ -1,0 +1,10 @@
+{
+  "name": "hopstream_3d",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HopStream 3D: Solana Token-2022 Route Terminal - Syndicate 60 FPS Graphics Engine",
+  "scripts": {
+    "dev": "npx serve . -l 3000",
+    "serve": "python -m http.server 3000"
+  }
+}

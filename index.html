@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>HopStream 3D // Solana Token-2022 Programmable Multi-Hop Router</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(13, 17, 28, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --solana-purple: #9945ff;
+      --solana-green: #14f195;
+      --cyan: #00f2fe;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body, html {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: var(--text-main);
+      user-select: none;
+    }
+    
+    canvas#webgl-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: 1;
+    }
+
+    /* Top Navigation Header */
+    header {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 72px;
+      padding: 0 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 20;
+      background: linear-gradient(180deg, rgba(7, 9, 14, 0.9) 0%, rgba(7, 9, 14, 0) 100%);
+      pointer-events: none;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      pointer-events: auto;
+    }
+    .brand-logo {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--solana-purple), var(--solana-green));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(20, 241, 149, 0.4);
+    }
+    .brand-logo svg { width: 20px; height: 20px; fill: #000; }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge-protocol {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(20, 241, 149, 0.12);
+      border: 1px solid rgba(20, 241, 149, 0.3);
+      color: var(--solana-green);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      pointer-events: auto;
+    }
+    .network-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--solana-green);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot-live {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--solana-green);
+      box-shadow: 0 0 8px var(--solana-green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    button.btn-connect {
+      padding: 10px 22px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #9945ff, #14f195);
+      border: none;
+      color: #07090e;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 4px 20px rgba(153, 69, 255, 0.3);
+    }
+    button.btn-connect:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 26px rgba(20, 241, 149, 0.5);
+    }
+
+    /* Left Control Sidebar (The Route Architect) */
+    aside.sidebar {
+      position: absolute;
+      top: 92px; left: 32px; bottom: 32px;
+      width: 420px;
+      background: var(--card-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      z-index: 10;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+      overflow-y: auto;
+    }
+    aside.sidebar::-webkit-scrollbar { width: 4px; }
+    aside.sidebar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+
+    .sidebar-section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-route-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .stat-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px 10px;
+      text-align: center;
+    }
+    .stat-box .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--solana-green);
+    }
+    .stat-box .lbl {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+    }
+
+    /* Input Controls */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    input, select {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: #fff;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus {
+      border-color: var(--solana-green);
+      box-shadow: 0 0 12px rgba(20, 241, 149, 0.15);
+    }
+
+    /* Hop Stepper slider */
+    .hops-control {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      outline: none;
+      padding: 0;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--solana-green);
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--solana-green);
+    }
+
+    /* Program Architecture Badge */
+    .programs-tree {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .programs-tree .core { color: var(--solana-purple); font-weight: 600; }
+    .programs-tree .guard { color: var(--solana-green); font-weight: 600; }
+
+    /* Action Buttons */
+    .btn-group {
+      display: flex;
+      gap: 12px;
+      margin-top: auto;
+    }
+    .btn-primary {
+      flex: 1;
+      padding: 14px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--solana-purple), var(--solana-green));
+      color: #07090e;
+      font-weight: 700;
+      font-size: 13px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary:hover {
+      box-shadow: 0 8px 30px rgba(20, 241, 149, 0.4);
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      padding: 14px 18px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Bottom Natural Language AI Dispatcher */
+    .ai-dispatcher {
+      position: absolute;
+      bottom: 32px;
+      left: 474px;
+      right: 32px;
+      background: var(--card-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 14px 20px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+    .ai-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: rgba(153, 69, 255, 0.15);
+      border: 1px solid rgba(153, 69, 255, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--solana-purple);
+      font-weight: 800;
+      font-size: 12px;
+    }
+    .ai-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 14px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      outline: none;
+    }
+    .ai-input::placeholder { color: #6b7280; }
+    .btn-dispatch {
+      padding: 8px 18px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn-dispatch:hover {
+      background: var(--solana-green);
+      color: #07090e;
+      border-color: var(--solana-green);
+    }
+
+    /* Live Telemetry Pill */
+    .telemetry-hud {
+      position: absolute;
+      top: 92px; right: 32px;
+      z-index: 10;
+      background: rgba(13, 17, 28, 0.7);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .telemetry-row { display: flex; justify-content: space-between; gap: 20px; }
+    .telemetry-row span:last-child { color: var(--solana-green); font-weight: 600; }
+  </style>
+
+  <!-- Solana Web3.js via official CDN -->
+  <script src="https://unpkg.com/@solana/web3.js@1.95.4/lib/index.iife.min.js"></script>
+
+  <!-- Three.js Import Map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <!-- WebGL 3D Route Topology Viewport -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24"><path d="M4 18L10 12L4 6M12 18H20"/></svg>
+      </div>
+      <div class="brand-title">
+        HOPSTREAM 3D
+        <span class="badge-protocol">TOKEN-2022 MULTIHOPPER</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div class="network-badge">
+        <div class="dot-live"></div>
+        <span id="network-display">SOLANA DEVNET</span>
+      </div>
+      <button class="btn-connect" id="btn-wallet">CONNECT PHANTOM</button>
+    </div>
+  </header>
+
+  <!-- Route Architect Left Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section-title">
+      <span>Route Architecture</span>
+      <span style="color: var(--solana-green); font-family: 'JetBrains Mono';">SWIFT 2.0</span>
+    </div>
+
+    <!-- Quick Telemetry Stats -->
+    <div class="card-route-stats">
+      <div class="stat-box">
+        <div class="val" id="stat-hops">3 HOPS</div>
+        <div class="lbl">Sequencing</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" id="stat-fee">0.00015 SOL</div>
+        <div class="lbl">Keeper Rent</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" id="stat-tps">16.6ms</div>
+        <div class="lbl">Engine FPS</div>
+      </div>
+    </div>
+
+    <!-- Token & Amount Field -->
+    <div class="field-group">
+      <label>ROUTED ASSET & VAULT DEPOSIT</label>
+      <div class="input-wrapper">
+        <select id="select-asset">
+          <option value="USDC-2022">USDC (Token-2022 Transfer Hook Guard)</option>
+          <option value="SOL">Wrapped Native SOL</option>
+          <option value="BONK">BONK (Automated Multi-Split)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label>TOTAL TRANSFER VALUE</label>
+      <div class="input-wrapper">
+        <input type="number" id="input-amount" value="1000" min="1" step="10">
+      </div>
+    </div>
+
+    <!-- Hops Count Stepper Slider -->
+    <div class="hops-control">
+      <div class="slider-header">
+        <span style="color: var(--text-muted); font-weight: 600;">HOPS SEQUENCING</span>
+        <span id="hops-label" style="color: var(--solana-green); font-weight: 700; font-family: 'JetBrains Mono';">3 Hops (Staggered 30s)</span>
+      </div>
+      <input type="range" id="slider-hops" min="1" max="5" value="3">
+    </div>
+
+    <!-- MultiHopper Programs Verified -->
+    <div class="field-group">
+      <label>ON-CHAIN PROTOCOL GUARDS</label>
+      <div class="programs-tree">
+        <div>• Core Program: <span class="core">3jLoS2wb...pFh</span></div>
+        <div>• Orchestrator: <span class="core">4TPCmR2u...ruX</span></div>
+        <div>• Transfer Hook: <span class="guard">2JEv3pD6...3r52</span></div>
+        <div>• Execution: <span style="color: #00f2fe;">Permanent Delegate 1:1</span></div>
+      </div>
+    </div>
+
+    <!-- Primary Action Buttons -->
+    <div class="btn-group">
+      <button class="btn-secondary" id="btn-simulate">SIMULATE</button>
+      <button class="btn-primary" id="btn-deploy">DEPLOY ROUTE</button>
+    </div>
+  </aside>
+
+  <!-- Live Telemetry Monitor -->
+  <div class="telemetry-hud">
+    <div class="telemetry-row"><span>Vault Status:</span> <span>SYNCHRONIZED</span></div>
+    <div class="telemetry-row"><span>Active Keepers:</span> <span id="telemetry-keepers">14 Online</span></div>
+    <div class="telemetry-row"><span>Route Latency:</span> <span>420ms</span></div>
+  </div>
+
+  <!-- Bottom AI Agentic Natural Language Dispatcher -->
+  <div class="ai-dispatcher">
+    <div class="ai-icon">AI</div>
+    <input type="text" class="ai-input" id="ai-prompt-input" placeholder="Natural Language Route Dispatch: 'Split 500 USDC into 3 hops with 15s delays to Treasury and Contributor'">
+    <button class="btn-dispatch" id="btn-ai-dispatch">
+      <span>PARSE & DISPATCH</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="src/main.js"></script>
+  <script src="src/canvas_recorder.js"></script>
+</body>
+</html>
