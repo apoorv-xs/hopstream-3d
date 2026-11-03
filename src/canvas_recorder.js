@@ -10,20 +10,25 @@
         return;
       }
 
+      // Avoid duplicate injections
+      if (document.getElementById("syndicate-rec-badge")) return;
+
       const duration = (options.durationSeconds || 15) * 1000;
       const fps = options.fps || 60;
-      const filename = options.filename || "syndicate_showreel_60fps.webm";
+      const filename = options.filename || "hopstream_3d_60fps_showreel.webm";
 
       let mediaRecorder = null;
       let recordedChunks = [];
       let isRecording = false;
 
-      // Inject subtle UI badge
+      // Inject subtle UI badge in header or dedicated container if available
+      const container = document.getElementById("recorder-slot") || document.body;
       const badge = document.createElement("div");
       badge.id = "syndicate-rec-badge";
-      badge.style.cssText = "position:fixed;top:20px;right:20px;padding:6px 14px;background:rgba(20,20,25,0.85);border:1px solid rgba(255,255,255,0.2);border-radius:20px;color:#fff;font-family:monospace;font-size:11px;letter-spacing:1px;z-index:99999;pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:8px;backdrop-filter:blur(8px);transition:all 0.3s ease;";
-      badge.innerHTML = `<span style="width:8px;height:8px;border-radius:50%;background:#888;" id="rec-dot"></span><span>PRESS 'R' TO RECORD (60 FPS)</span>`;
-      document.body.appendChild(badge);
+      badge.className = "recorder-pill";
+      badge.innerHTML = `<span class="rec-dot" id="rec-dot"></span><span class="rec-txt">REC (60 FPS)</span>`;
+      badge.title = "Click or Press 'R' to export 15s 60 FPS WebM Showreel";
+      container.appendChild(badge);
 
       function startRecording() {
         if (isRecording) return;
@@ -62,19 +67,23 @@
           }, 100);
 
           isRecording = false;
-          badge.style.borderColor = "rgba(255,255,255,0.2)";
-          badge.querySelector("span:last-child").textContent = "RECORD COMPLETED (DOWNLOADED)";
-          badge.querySelector("#rec-dot").style.background = "#00ffaa";
+          badge.classList.remove("recording");
+          const txt = badge.querySelector(".rec-txt");
+          const dot = badge.querySelector("#rec-dot");
+          if (txt) txt.textContent = "SAVED!";
+          if (dot) dot.style.background = "#14f195";
           setTimeout(() => {
-            badge.querySelector("span:last-child").textContent = "PRESS 'R' TO RECORD (60 FPS)";
-            badge.querySelector("#rec-dot").style.background = "#888";
+            if (txt) txt.textContent = "REC (60 FPS)";
+            if (dot) dot.style.background = "#888";
           }, 3000);
         };
 
         mediaRecorder.start(100);
-        badge.style.borderColor = "#ff3366";
-        badge.querySelector("span:last-child").textContent = `RECORDING (15s @ ${fps} FPS)...`;
-        badge.querySelector("#rec-dot").style.background = "#ff3366";
+        badge.classList.add("recording");
+        const txt = badge.querySelector(".rec-txt");
+        const dot = badge.querySelector("#rec-dot");
+        if (txt) txt.textContent = `REC (15s)...`;
+        if (dot) dot.style.background = "#ff3366";
 
         setTimeout(() => {
           if (mediaRecorder && mediaRecorder.state !== "inactive") {
@@ -86,6 +95,8 @@
       badge.addEventListener("click", startRecording);
       window.addEventListener("keydown", (e) => {
         if (e.key === "r" || e.key === "R") {
+          // If not typing in input
+          if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return;
           startRecording();
         }
       });
