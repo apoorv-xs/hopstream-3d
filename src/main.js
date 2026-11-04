@@ -278,10 +278,10 @@ const LuxuryCinematicShader = {
   uniforms: {
     tDiffuse: { value: null },
     uTime: { value: 0 },
-    uAberration: { value: 0.0032 },
-    uGrainIntensity: { value: 0.042 },
-    uVignetteDarkness: { value: 1.15 },
-    uVignetteOffset: { value: 0.85 }
+    uAberration: { value: 0.0014 },
+    uGrainIntensity: { value: 0.008 },
+    uVignetteDarkness: { value: 0.70 },
+    uVignetteOffset: { value: 0.92 }
   },
   vertexShader: `
     varying vec2 vUv;
@@ -354,6 +354,15 @@ scene.add(purpleLight);
 const greenLight = new THREE.PointLight(0xD4F83A, 4.5, 60);
 greenLight.position.set(18, 12, -10);
 scene.add(greenLight);
+
+// Grazing Specular Lighting (Illuminates Chassis Chamfers & Titanium Bevels)
+const chassisKeyLight = new THREE.DirectionalLight(0xffffff, 2.6);
+chassisKeyLight.position.set(-12, 12, 22);
+scene.add(chassisKeyLight);
+
+const chassisRimLight = new THREE.DirectionalLight(0x00f2fe, 2.2);
+chassisRimLight.position.set(16, 8, -18);
+scene.add(chassisRimLight);
 
 // 3.1 Deep Cosmic Quantum Starfield
 function createStarfield() {
@@ -472,12 +481,12 @@ const floorMat = new THREE.ShaderMaterial({
       float caustics = clamp(c1 * 0.65 + c2 * 0.35, 0.0, 1.0);
 
       float dist = length(vWorldPos.xz);
-      float fade = smoothstep(45.0, 3.0, dist);
+      float fade = smoothstep(65.0, 5.0, dist) * exp(-dist * 0.038);
 
       vec3 causticColor = mix(uColorA, uColorB, caustics);
       vec3 finalColor = mix(uDarkFloor, causticColor, caustics * fade * 0.12);
 
-      gl_FragColor = vec4(finalColor, fade * 0.70);
+      gl_FragColor = vec4(finalColor, fade * 0.65);
     }
   `,
   transparent: true,
@@ -561,6 +570,7 @@ let particleSystems = [];
 let cometStreams = [];
 let animatedSubpieces = [];
 let plasmaConduits = [];
+let tractorBeams = [];
 
 // Ultra-Crisp 1024x288 High-DPI Canvas Text Sprite Generator (Space Grotesk + JetBrains Mono + Status LED)
 function createHoloTextSprite(text, subtext, colorHex) {
@@ -623,8 +633,69 @@ function createHoloTextSprite(text, subtext, colorHex) {
     depthWrite: false
   });
   const sprite = new THREE.Sprite(spriteMat);
-  sprite.scale.set(3.8, 1.07, 1.0);
+  sprite.scale.set(2.8, 0.78, 1.0);
   return sprite;
+}
+
+// Luminous Vertical Holographic Containment / Tractor Beams
+function createTractorBeam(targetPos, groundY, colorHex) {
+  const height = Math.max(targetPos.y - groundY, 0.3);
+  const geo = new THREE.CylinderGeometry(0.55, 0.95, height, 24, 1, true);
+  geo.translate(0, height / 2, 0);
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(colorHex) }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vViewPos;
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+        vViewPos = -mvPos.xyz;
+        gl_Position = projectionMatrix * mvPos;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform vec3 uColor;
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vViewPos;
+
+      void main() {
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(vViewPos);
+        float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 2.0);
+
+        // Upward energetic magnetic containment pulse
+        float pulse = sin((vUv.y * 12.0) - (uTime * 4.0)) * 0.5 + 0.5;
+        pulse = pow(pulse, 3.0);
+
+        // Vertical fade to anchor smoothly into pedestal ring
+        float vertFade = smoothstep(0.0, 0.22, vUv.y) * smoothstep(1.0, 0.72, vUv.y);
+
+        float alpha = clamp((fresnel * 0.40 + pulse * 0.45) * vertFade, 0.0, 0.75);
+        vec3 finalCol = mix(uColor, vec3(1.0, 1.0, 1.0), pulse * 0.4);
+
+        gl_FragColor = vec4(finalCol, alpha);
+      }
+    `,
+    transparent: true,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+
+  const beam = new THREE.Mesh(geo, mat);
+  beam.position.set(targetPos.x, groundY, targetPos.z);
+  nodeGroup.add(beam);
+  tractorBeams.push(mat);
+  return beam;
 }
 
 // Dynamic Shockwave Ripples (Visual Feedback on Simulation & Clicks)
@@ -720,29 +791,56 @@ function rebuildTopology(hops) {
   cometStreams = [];
   animatedSubpieces = [];
   plasmaConduits = [];
+  tractorBeams = [];
 
   // 0. Physical Monolithic Routing Chassis (The Solana Quantum Blade)
   if (loadedModels.chassis) {
     const chassisScene = loadedModels.chassis.clone();
     chassisScene.position.set(0, 0, 0);
     chassisScene.traverse((c) => {
-      if (c.isMesh && c.material) {
+      if (c.isMesh) {
         c.castShadow = true;
         c.receiveShadow = true;
+        const name = c.name || '';
+        if (name.includes('Main_Slab')) {
+          c.material = new THREE.MeshPhysicalMaterial({
+            color: 0x080d16,
+            roughness: 0.28,
+            metalness: 0.82,
+            clearcoat: 0.65,
+            clearcoatRoughness: 0.12,
+            reflectivity: 0.95
+          });
+        } else if (name.includes('Rail') || name.includes('Bay') || name.includes('Well') || name.includes('Dock')) {
+          c.material = new THREE.MeshPhysicalMaterial({
+            color: 0x16202e,
+            roughness: 0.18,
+            metalness: 0.95,
+            clearcoat: 0.90,
+            clearcoatRoughness: 0.08,
+            reflectivity: 1.0
+          });
+        } else if (name.includes('Ring') || name.includes('Fiber') || name.includes('Lime') || name.includes('Cyan')) {
+          const isCyan = name.includes('Cyan') || name.includes('Well') || name.includes('Fiber');
+          c.material = new THREE.MeshBasicMaterial({
+            color: isCyan ? 0x00f2fe : 0xD4F83A
+          });
+        }
       }
     });
     nodeGroup.add(chassisScene);
   }
 
   // 1. Origin: User Wallet Node (Left, offset clear of sidebar)
-  const originPos = new THREE.Vector3(-13.5, 0, 0);
+  const originPos = new THREE.Vector3(-13.5, 0.35, 0.0);
+  createTractorBeam(originPos, -0.78, 0x9945ff);
+
   let originNode;
   if (loadedModels.wallet) {
     const walletScene = loadedModels.wallet.clone();
-    walletScene.scale.setScalar(2.2);
+    walletScene.scale.setScalar(2.0);
     walletScene.position.copy(originPos);
     
-    // Find representative mesh for raycasting
     let hitMesh = null;
     walletScene.traverse((c) => {
       if (c.isMesh) {
@@ -760,22 +858,24 @@ function rebuildTopology(hops) {
     nodeGroup.add(walletScene);
     originNode = { group: walletScene, core: hitMesh || walletScene };
   } else {
-    originNode = createCrystalNode(new THREE.IcosahedronGeometry(1.3, 1), 0x9945ff, 1.3);
+    originNode = createCrystalNode(new THREE.IcosahedronGeometry(1.2, 1), 0x9945ff, 1.2);
     originNode.group.position.copy(originPos);
     nodeGroup.add(originNode.group);
   }
   nodes.push({ id: 'origin', pos: originPos, label: 'ORIGIN', mesh: originNode });
 
   const originSprite = createHoloTextSprite('ORIGIN', 'Phantom Wallet', '#9945ff');
-  originSprite.position.set(originPos.x, originPos.y + 2.5, originPos.z);
+  originSprite.position.set(originPos.x, originPos.y + 1.25, originPos.z);
   labelGroup.add(originSprite);
 
   // 2. Vault Minter Node (Center-Left: Bespoke Blender 5.2 MultiHopper Kinetic Reactor)
-  const vaultPos = new THREE.Vector3(-4.5, 3, 1.5);
+  const vaultPos = new THREE.Vector3(-4.5, 1.15, 1.5);
+  createTractorBeam(vaultPos, -0.72, 0x00f2fe);
+
   let vaultNode;
   if (loadedModels.reactor) {
     const reactorScene = loadedModels.reactor.clone();
-    reactorScene.scale.setScalar(1.55);
+    reactorScene.scale.setScalar(1.4);
     reactorScene.position.copy(vaultPos);
 
     let hitMesh = null;
@@ -829,14 +929,14 @@ function rebuildTopology(hops) {
     vaultNode = { group: valScene, core: valMesh || valScene, subOrbs: orbs };
     animatedSubpieces.push({ type: 'validator', obj: valScene, orbs });
   } else {
-    vaultNode = createCrystalNode(new THREE.DodecahedronGeometry(1.8, 1), 0x00f2fe, 1.8);
+    vaultNode = createCrystalNode(new THREE.DodecahedronGeometry(1.5, 1), 0x00f2fe, 1.5);
     vaultNode.group.position.copy(vaultPos);
     nodeGroup.add(vaultNode.group);
   }
   nodes.push({ id: 'vault', pos: vaultPos, label: 'VAULT', mesh: vaultNode });
 
   const vaultSprite = createHoloTextSprite('CORE PDA', 'Token-2022 Escrow', '#00f2fe');
-  vaultSprite.position.set(vaultPos.x, vaultPos.y + 3.0, vaultPos.z);
+  vaultSprite.position.set(vaultPos.x, vaultPos.y + 1.55, vaultPos.z);
   labelGroup.add(vaultSprite);
 
   // Connect Origin -> Vault
@@ -848,14 +948,15 @@ function rebuildTopology(hops) {
   for (let i = 1; i <= hops; i++) {
     const angle = (i / (hops + 1)) * Math.PI;
     const x = -4.5 + (i * hopStepX);
-    const y = Math.sin(angle) * 3.8 + 1;
+    const y = Math.sin(angle) * 1.35 + 0.95;
     const z = Math.cos(angle) * 3.8 - 2;
     const hopPos = new THREE.Vector3(x, y, z);
+    createTractorBeam(hopPos, -0.84, 0xD4F83A);
     
     let hopNode;
     if (loadedModels.relay) {
       const relayScene = loadedModels.relay.clone();
-      relayScene.scale.setScalar(1.25);
+      relayScene.scale.setScalar(1.2);
       relayScene.position.copy(hopPos);
 
       let dialRing = null;
@@ -886,7 +987,7 @@ function rebuildTopology(hops) {
     nodes.push({ id: `hop-${i}`, pos: hopPos, label: `HOP ${i}`, mesh: hopNode });
 
     const hopSprite = createHoloTextSprite(`RELAY ${i}`, 'Keeper Timelock', '#D4F83A');
-    hopSprite.position.set(hopPos.x, hopPos.y + 2.2, hopPos.z);
+    hopSprite.position.set(hopPos.x, hopPos.y + 1.35, hopPos.z);
     labelGroup.add(hopSprite);
 
     createRouteCurve(lastPos, hopPos, 0xD4F83A);
@@ -894,73 +995,105 @@ function rebuildTopology(hops) {
   }
 
   // 4. Final Redemptions: Split Destinations (Right: Sculpted DAO Treasury & Liquidity Pool)
-  const dest1Pos = new THREE.Vector3(17.5, 2, -3);
-  let dest1Node;
-  if (loadedModels.dao) {
-    const daoScene = loadedModels.dao.clone();
-    daoScene.scale.setScalar(0.28);
-    daoScene.position.copy(dest1Pos);
+  const dest1Pos = new THREE.Vector3(17.5, 0.95, -3.0);
+  createTractorBeam(dest1Pos, -0.82, 0x00f2fe);
 
-    let daoMesh = null;
-    daoScene.traverse((c) => {
-      if (c.isMesh) {
-        c.material = new THREE.MeshPhysicalMaterial({
-          color: 0x00f2fe,
-          emissive: 0x00f2fe,
-          emissiveIntensity: 0.22,
-          roughness: 0.25,
-          metalness: 0.6,
-          clearcoat: 0.6
-        });
-        if (!daoMesh) daoMesh = c;
-      }
-    });
-    nodeGroup.add(daoScene);
-    dest1Node = { group: daoScene, core: daoMesh || daoScene };
-  } else {
-    dest1Node = createCrystalNode(new THREE.IcosahedronGeometry(1.2, 1), 0x00f2fe, 1.2);
-    dest1Node.group.position.copy(dest1Pos);
-    nodeGroup.add(dest1Node.group);
+  let dest1Node;
+  const treasuryGroup = new THREE.Group();
+  treasuryGroup.position.copy(dest1Pos);
+
+  // Central Prestigious Crystalline Treasury Vault Core
+  const treasuryCoreGeo = new THREE.OctahedronGeometry(0.95, 1);
+  const treasuryCoreMat = new THREE.MeshPhysicalMaterial({
+    color: 0x00f2fe,
+    emissive: 0x00f2fe,
+    emissiveIntensity: 0.35,
+    roughness: 0.12,
+    metalness: 0.25,
+    transmission: 0.75,
+    thickness: 1.4,
+    ior: 1.55,
+    clearcoat: 1.0,
+    reflectivity: 0.9
+  });
+  const treasuryCore = new THREE.Mesh(treasuryCoreGeo, treasuryCoreMat);
+  treasuryGroup.add(treasuryCore);
+
+  const tRingGeo = new THREE.TorusGeometry(1.3, 0.035, 16, 48);
+  const tRingMat = new THREE.MeshStandardMaterial({
+    color: 0x00f2fe,
+    metalness: 0.95,
+    roughness: 0.2
+  });
+  const tRing = new THREE.Mesh(tRingGeo, tRingMat);
+  tRing.rotation.x = Math.PI / 4;
+  treasuryGroup.add(tRing);
+
+  // 3 Pristine Governance Satellite Shards Orbiting Treasury Core
+  const satGroup = new THREE.Group();
+  for (let s = 0; s < 3; s++) {
+    const sGeo = new THREE.OctahedronGeometry(0.22, 0);
+    const sMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, wireframe: true });
+    const sMesh = new THREE.Mesh(sGeo, sMat);
+    const sAngle = (s / 3) * Math.PI * 2;
+    sMesh.position.set(Math.cos(sAngle) * 1.55, Math.sin(sAngle * 2) * 0.25, Math.sin(sAngle) * 1.55);
+    satGroup.add(sMesh);
   }
+  treasuryGroup.add(satGroup);
+
+  nodeGroup.add(treasuryGroup);
+  dest1Node = { group: treasuryGroup, core: treasuryCore, ring: tRing, satGroup };
   nodes.push({ id: 'dest-a', pos: dest1Pos, label: 'TREASURY', mesh: dest1Node });
 
   const dest1Sprite = createHoloTextSprite('TREASURY', '60% Settled', '#00f2fe');
-  dest1Sprite.position.set(dest1Pos.x, dest1Pos.y + 2.4, dest1Pos.z);
+  dest1Sprite.position.set(dest1Pos.x, dest1Pos.y + 1.35, dest1Pos.z);
   labelGroup.add(dest1Sprite);
   createRouteCurve(lastPos, dest1Pos, 0x00f2fe);
 
-  const dest2Pos = new THREE.Vector3(17.5, -2, 4);
-  let dest2Node;
-  if (loadedModels.liquidity) {
-    const liqScene = loadedModels.liquidity.clone();
-    liqScene.scale.setScalar(0.045);
-    liqScene.position.copy(dest2Pos);
+  const dest2Pos = new THREE.Vector3(17.5, 0.95, 3.0);
+  createTractorBeam(dest2Pos, -0.82, 0xD4F83A);
 
-    let liqMesh = null;
-    liqScene.traverse((c) => {
-      if (c.isMesh) {
-        c.material = new THREE.MeshPhysicalMaterial({
-          color: 0xD4F83A,
-          emissive: 0xD4F83A,
-          emissiveIntensity: 0.24,
-          roughness: 0.15,
-          metalness: 0.5,
-          clearcoat: 0.8
-        });
-        if (!liqMesh) liqMesh = c;
-      }
-    });
-    nodeGroup.add(liqScene);
-    dest2Node = { group: liqScene, core: liqMesh || liqScene };
-  } else {
-    dest2Node = createCrystalNode(new THREE.IcosahedronGeometry(1.1, 1), 0xD4F83A, 1.1);
-    dest2Node.group.position.copy(dest2Pos);
-    nodeGroup.add(dest2Node.group);
-  }
+  // Pristine Acid Lime Contributor Settlement Crystal
+  const contributorGroup = new THREE.Group();
+  contributorGroup.position.copy(dest2Pos);
+
+  const contCoreGeo = new THREE.IcosahedronGeometry(0.95, 1);
+  const contCoreMat = new THREE.MeshPhysicalMaterial({
+    color: 0xD4F83A,
+    emissive: 0xD4F83A,
+    emissiveIntensity: 0.32,
+    roughness: 0.14,
+    metalness: 0.20,
+    transmission: 0.72,
+    thickness: 1.4,
+    ior: 1.52,
+    clearcoat: 1.0,
+    reflectivity: 0.9
+  });
+  const contCore = new THREE.Mesh(contCoreGeo, contCoreMat);
+  contributorGroup.add(contCore);
+
+  const cInnerGeo = new THREE.SphereGeometry(0.38, 16, 16);
+  const cInnerMat = new THREE.MeshBasicMaterial({ color: 0xD4F83A, transparent: true, opacity: 0.85 });
+  const cInner = new THREE.Mesh(cInnerGeo, cInnerMat);
+  contributorGroup.add(cInner);
+
+  const cRingGeo = new THREE.TorusGeometry(1.3, 0.035, 16, 48);
+  const cRingMat = new THREE.MeshStandardMaterial({
+    color: 0xD4F83A,
+    metalness: 0.95,
+    roughness: 0.2
+  });
+  const cRing = new THREE.Mesh(cRingGeo, cRingMat);
+  cRing.rotation.x = -Math.PI / 4;
+  contributorGroup.add(cRing);
+
+  nodeGroup.add(contributorGroup);
+  const dest2Node = { group: contributorGroup, core: contCore, ring: cRing };
   nodes.push({ id: 'dest-b', pos: dest2Pos, label: 'CONTRIBUTOR', mesh: dest2Node });
 
   const dest2Sprite = createHoloTextSprite('CONTRIBUTOR', '40% Settled', '#D4F83A');
-  dest2Sprite.position.set(dest2Pos.x, dest2Pos.y + 2.2, dest2Pos.z);
+  dest2Sprite.position.set(dest2Pos.x, dest2Pos.y + 1.35, dest2Pos.z);
   labelGroup.add(dest2Sprite);
   createRouteCurve(lastPos, dest2Pos, 0xD4F83A);
 
@@ -1198,10 +1331,13 @@ function animate() {
   LuxuryCinematicShader.uniforms.uTime.value = time;
   cameraDirector.update(delta);
 
-  // Update Dynamic Plasma Energy Conduits (Active Theory Fresnel Plasma)
+  // Update Dynamic Plasma Energy Conduits & Tractor Containment Beams
   plasmaConduits.forEach(m => {
     m.uniforms.uTime.value = time;
     m.uniforms.uSpeed.value = state.simulating ? 7.5 : 2.8;
+  });
+  tractorBeams.forEach(m => {
+    m.uniforms.uTime.value = time;
   });
 
   // Drift Atmospheric Motes (Active Theory Marine Snow)
@@ -1236,10 +1372,12 @@ function animate() {
       n.mesh.wire.rotation.z += 0.3 * delta;
       n.mesh.gyroRing.rotation.z += 0.9 * delta;
       n.mesh.innerCore.scale.setScalar(1.0 + Math.sin(time * 3 + idx) * 0.15);
-      n.mesh.group.position.y += Math.sin(time * 2 + idx) * 0.0025;
+      n.mesh.group.position.y = n.pos.y + Math.sin(time * 2.2 + idx * 1.5) * 0.08;
     } else if (n.mesh && n.mesh.group) {
       n.mesh.group.rotation.y += 0.5 * delta;
-      n.mesh.group.position.y += Math.sin(time * 2 + idx) * 0.0025;
+      if (n.mesh.ring) n.mesh.ring.rotation.z += 0.8 * delta;
+      if (n.mesh.satGroup) n.mesh.satGroup.rotation.y += 1.2 * delta;
+      n.mesh.group.position.y = n.pos.y + Math.sin(time * 2.2 + idx * 1.5) * 0.08;
     }
   });
 
@@ -1291,14 +1429,13 @@ function animate() {
     ps.system.geometry.attributes.position.needsUpdate = true;
   });
 
-  // Dynamic Billboard Elevation Pitch-Fade
+  // Dynamic Billboard Distance & Elevation Pitch-Fade (Prevents HUD Stacking)
   const pitch = Math.abs(camera.position.y / Math.max(camera.position.length(), 1.0));
   labelGroup.children.forEach(sprite => {
-    if (pitch > 0.45) {
-      sprite.material.opacity = Math.max(0.25, 1.0 - (pitch - 0.45) * 2.2);
-    } else {
-      sprite.material.opacity = 0.95;
-    }
+    const dist = camera.position.distanceTo(sprite.position);
+    const distFade = THREE.MathUtils.clamp(1.45 - (dist / 42.0), 0.35, 0.95);
+    const pitchFade = pitch > 0.45 ? Math.max(0.25, 1.0 - (pitch - 0.45) * 2.0) : 1.0;
+    sprite.material.opacity = distFade * pitchFade;
   });
 
   // Animate High-Energy Comets
