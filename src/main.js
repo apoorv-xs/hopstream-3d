@@ -191,7 +191,7 @@ controls.minAzimuthAngle = -Math.PI / 4;     // -45° left limit
 controls.maxAzimuthAngle = Math.PI / 4;      // +45° right limit
 
 controls.minDistance = 12;
-controls.maxDistance = 60;
+controls.maxDistance = 90;
 controls.touches = {
   ONE: THREE.TOUCH.ROTATE,
   TWO: THREE.TOUCH.DOLLY_PAN
@@ -234,16 +234,24 @@ function createStudioEnvironment(r) {
 
 scene.environment = createStudioEnvironment(renderer);
 
+// Stage-calibrated framing presets: offsets left sidebar (width ~390px) so Origin at X=-13.5 is fully visible in open stage
+const cameraFraming = {
+  desktop: {
+    pos: new THREE.Vector3(-10.0, 15.0, 38.0),
+    target: new THREE.Vector3(-3.0, 0.5, 0)
+  },
+  mobile: {
+    pos: new THREE.Vector3(2.0, 24.0, 78.0),
+    target: new THREE.Vector3(2.0, 0.5, 0)
+  }
+};
+
 // Calibrate initial camera based on viewport aspect
 function adjustCameraForViewport() {
   state.isMobile = window.innerWidth <= 1024;
-  if (state.isMobile) {
-    camera.position.set(0, 16, 48);
-    controls.target.set(0, 1, 0);
-  } else {
-    camera.position.set(2, 14, 28);
-    controls.target.set(1, 1, 0);
-  }
+  const preset = state.isMobile ? cameraFraming.mobile : cameraFraming.desktop;
+  camera.position.copy(preset.pos);
+  controls.target.copy(preset.target);
   controls.update();
 }
 adjustCameraForViewport();
@@ -540,6 +548,9 @@ function preloadModels(callback) {
   models.forEach(m => {
     gltfLoader.load(m.path, (gltf) => {
       console.log('[+] Loaded GLTF model successfully:', m.key, m.path);
+      gltf.scene.traverse((c) => {
+        c.userData.isCachedGltf = true;
+      });
       loadedModels[m.key] = gltf.scene;
       loaded++;
       if (loaded === models.length) {
@@ -772,10 +783,14 @@ function createCrystalNode(geometry, colorHex, radius = 1.0) {
   return { group, core, innerCore, wire, gyroRing, baseColor: colorHex };
 }
 
-// Recursive GPU Memory Lifecycle Disposal (Prevents VRAM & Texture Leaks)
+// Recursive GPU Memory Lifecycle Disposal (Prevents VRAM & Texture Leaks while preserving cached GLTF assets)
 function disposeHierarchy(obj) {
   if (!obj) return;
   obj.traverse((child) => {
+    // Never dispose geometries or shared textures of cached GLTF assets reused via .clone()
+    if (child.userData && child.userData.isCachedGltf) {
+      return;
+    }
     if (child.geometry) {
       child.geometry.dispose();
     }
@@ -1260,8 +1275,8 @@ const cameraDirector = {
   active: false,
   targetCamPos: new THREE.Vector3(),
   targetLookAt: new THREE.Vector3(),
-  homeCamPos: new THREE.Vector3(2, 14, 28),
-  homeLookAt: new THREE.Vector3(1, 1, 0),
+  homeCamPos: new THREE.Vector3(-10.0, 15.0, 38.0),
+  homeLookAt: new THREE.Vector3(-3.0, 0.5, 0),
   dampFactor: 3.2,
   shakeIntensity: 0,
 
@@ -1282,8 +1297,9 @@ const cameraDirector = {
 
   reset() {
     this.active = true;
-    this.targetCamPos.copy(this.homeCamPos);
-    this.targetLookAt.copy(this.homeLookAt);
+    const preset = state.isMobile ? cameraFraming.mobile : cameraFraming.desktop;
+    this.targetCamPos.copy(preset.pos);
+    this.targetLookAt.copy(preset.target);
   },
 
   update(delta) {
