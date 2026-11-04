@@ -54,6 +54,13 @@
 
         mediaRecorder.onstop = () => {
           const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            window.lastRecordedWebmBase64 = reader.result;
+            console.log('[SyndicateRecorder] Recording complete. Base64 ready.');
+          };
+          reader.readAsDataURL(blob);
+
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.style.display = "none";
