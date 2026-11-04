@@ -120,9 +120,17 @@ renderer.toneMappingExposure = 1.15;
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
-controls.maxPolarAngle = Math.PI / 2 + 0.04;
-controls.minDistance = 8;
-controls.maxDistance = 70;
+
+// Strictly clamp elevation: never drop under floor plane, prevent steep top-down occlusion
+controls.minPolarAngle = Math.PI / 5;        // ~36° minimum elevation
+controls.maxPolarAngle = Math.PI / 2 - 0.08; // ~85° maximum (strict ground horizon)
+
+// Strictly constrain azimuth to front 90° arc: prevents nodes from clipping behind sidebar
+controls.minAzimuthAngle = -Math.PI / 4;     // -45° left limit
+controls.maxAzimuthAngle = Math.PI / 4;      // +45° right limit
+
+controls.minDistance = 12;
+controls.maxDistance = 60;
 controls.touches = {
   ONE: THREE.TOUCH.ROTATE,
   TWO: THREE.TOUCH.DOLLY_PAN
@@ -654,6 +662,16 @@ function animate() {
       positions[i * 3 + 2] = pt.z;
     }
     ps.system.geometry.attributes.position.needsUpdate = true;
+  });
+
+  // Dynamic Billboard Elevation Pitch-Fade (Prevents labels from covering 3D crystal nodes)
+  const pitch = Math.abs(camera.position.y / Math.max(camera.position.length(), 1.0));
+  labelGroup.children.forEach(sprite => {
+    if (pitch > 0.45) {
+      sprite.material.opacity = Math.max(0.25, 1.0 - (pitch - 0.45) * 2.2);
+    } else {
+      sprite.material.opacity = 0.95;
+    }
   });
 
   // Animate High-Energy Comets
