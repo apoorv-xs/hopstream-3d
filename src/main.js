@@ -3,10 +3,12 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // =========================================================================
-// HOPSTREAM 3D // ULTRA-REALISTIC PHYSICALLY-BASED WEBGL ROUTER
+// HOPSTREAM 3D // BLENDER & ERAVEX STUDIO BESPOKE GLTF ENGINE
 // 60 FPS Viewport Standard · PBR Refraction · Interactive Raycasting
 // =========================================================================
 
@@ -22,7 +24,8 @@ const state = {
   network: 'devnet',
   soundEnabled: true,
   isMobile: window.innerWidth <= 1024,
-  hoveredNode: null
+  hoveredNode: null,
+  modelsLoaded: false
 };
 
 // Protocol Program Constants
@@ -187,20 +190,80 @@ function adjustCameraForViewport() {
 adjustCameraForViewport();
 
 // =========================================================================
-// POST-PROCESSING: CALIBRATED UNREAL BLOOM PIPELINE
+// ERAVEX STUDIO POST-PROCESSING: UNREAL BLOOM + ANAMORPHIC CINEMATIC SHADER
 // =========================================================================
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
-// Calibrated bloom: preserves crystal facet refraction without blowout
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.60, // bloom strength
-  0.42, // bloom radius
-  0.38  // bloom threshold
+  0.65, // bloom strength
+  0.45, // bloom radius
+  0.35  // bloom threshold
 );
 composer.addPass(bloomPass);
+
+// Luxury Cinematic GLSL Shader (Chromatic Aberration + 35mm Film Grain + Vignette)
+const LuxuryCinematicShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uTime: { value: 0 },
+    uAberration: { value: 0.0032 },
+    uGrainIntensity: { value: 0.042 },
+    uVignetteDarkness: { value: 1.15 },
+    uVignetteOffset: { value: 0.85 }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uTime;
+    uniform float uAberration;
+    uniform float uGrainIntensity;
+    uniform float uVignetteDarkness;
+    uniform float uVignetteOffset;
+    varying vec2 vUv;
+
+    float random(vec2 p) {
+      return fract(sin(dot(p.xy, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+
+    void main() {
+      vec2 uv = vUv;
+      vec2 distFromCenter = uv - 0.5;
+      float dist = length(distFromCenter);
+
+      // 1. Radial Chromatic Aberration
+      float split = uAberration * dist * 1.8;
+      vec2 redUv = uv + distFromCenter * split;
+      vec2 blueUv = uv - distFromCenter * split;
+
+      float r = texture2D(tDiffuse, redUv).r;
+      float g = texture2D(tDiffuse, uv).g;
+      float b = texture2D(tDiffuse, blueUv).b;
+      vec3 color = vec3(r, g, b);
+
+      // 2. Anamorphic Vignette
+      float vignette = smoothstep(uVignetteOffset, uVignetteOffset - 0.5, dist);
+      color = mix(color * (1.0 - uVignetteDarkness * 0.42), color, vignette);
+
+      // 3. 35mm Film Grain
+      float grain = (random(uv * 1200.0 + fract(uTime * 19.0)) - 0.5) * uGrainIntensity;
+      color += grain;
+
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `
+};
+
+const cinematicPass = new ShaderPass(LuxuryCinematicShader);
+composer.addPass(cinematicPass);
 
 const outputPass = new OutputPass();
 composer.addPass(outputPass);
@@ -219,7 +282,7 @@ const purpleLight = new THREE.PointLight(0x9945ff, 4.0, 60);
 purpleLight.position.set(-18, 12, -10);
 scene.add(purpleLight);
 
-const greenLight = new THREE.PointLight(0x14f195, 4.5, 60);
+const greenLight = new THREE.PointLight(0xD4F83A, 4.5, 60);
 greenLight.position.set(18, 12, -10);
 scene.add(greenLight);
 
@@ -244,7 +307,7 @@ function createStarfield() {
     } else if (choice < 0.7) {
       colors[i * 3] = 0.6; colors[i * 3 + 1] = 0.27; colors[i * 3 + 2] = 1.0;
     } else {
-      colors[i * 3] = 0.85; colors[i * 3 + 1] = 0.9; colors[i * 3 + 2] = 1.0;
+      colors[i * 3] = 0.83; colors[i * 3 + 1] = 0.97; colors[i * 3 + 2] = 0.23; // Acid lime
     }
   }
 
@@ -264,13 +327,71 @@ function createStarfield() {
 const starfield = createStarfield();
 scene.add(starfield);
 
-// 3.2 Cybernetic Ground Grid & Concentric Radar Rings
+// 3.2 Cybernetic Ground Grid & Concentric MultiHopper Swirl Rings
 const gridHelper = new THREE.GridHelper(80, 60, 0x00f2fe, 0x111827);
 gridHelper.position.y = -4;
 scene.add(gridHelper);
 
+// ERAVEX Studio Procedural Wavefront Caustics Floor
+const floorGeo = new THREE.PlaneGeometry(100, 100, 32, 32);
+floorGeo.rotateX(-Math.PI / 2);
+const floorMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uTime: { value: 0 },
+    uColorA: { value: new THREE.Color(0x00f2fe) },
+    uColorB: { value: new THREE.Color(0xD4F83A) },
+    uDarkFloor: { value: new THREE.Color(0x04060a) }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vWorldPos;
+    void main() {
+      vUv = uv;
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldPos = worldPos.xyz;
+      gl_Position = projectionMatrix * viewMatrix * worldPos;
+    }
+  `,
+  fragmentShader: `
+    uniform float uTime;
+    uniform vec3 uColorA;
+    uniform vec3 uColorB;
+    uniform vec3 uDarkFloor;
+    varying vec2 vUv;
+    varying vec3 vWorldPos;
+
+    float causticWave(vec2 p, float t) {
+      vec2 p1 = p * 1.6 + vec2(t * 0.16, t * 0.11);
+      vec2 p2 = p * 2.1 - vec2(t * 0.13, t * 0.21);
+      float w1 = sin(p1.x + sin(p1.y * 1.3));
+      float w2 = cos(p2.y + cos(p2.x * 1.5));
+      return pow((w1 + w2) * 0.5 + 0.5, 3.0);
+    }
+
+    void main() {
+      vec2 p = vWorldPos.xz * 0.10;
+      float c1 = causticWave(p, uTime);
+      float c2 = causticWave(p * 1.3 + vec2(1.8, 3.1), uTime * 1.15);
+      float caustics = clamp(c1 * 0.65 + c2 * 0.35, 0.0, 1.0);
+
+      float dist = length(vWorldPos.xz);
+      float fade = smoothstep(45.0, 3.0, dist);
+
+      vec3 causticColor = mix(uColorA, uColorB, caustics);
+      vec3 finalColor = mix(uDarkFloor, causticColor, caustics * fade * 0.38);
+
+      gl_FragColor = vec4(finalColor, fade * 0.85);
+    }
+  `,
+  transparent: true,
+  depthWrite: false
+});
+const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+floorMesh.position.y = -4.01;
+scene.add(floorMesh);
+
 const radarGroup = new THREE.Group();
-radarGroup.position.set(-8, -3.95, 2);
+radarGroup.position.set(-5, -3.95, 2);
 radarGroup.rotation.x = -Math.PI / 2;
 
 [6, 12, 18, 24, 30].forEach((radius, i) => {
@@ -298,8 +419,44 @@ const reticleMesh = new THREE.Mesh(reticleGeo, reticleMat);
 scene.add(reticleMesh);
 
 // =========================================================================
-// 4. Physical Crystal Nodes & Route Topology Graph
+// 4. Bespoke Blender 5.2 glTF Models & Procedural Fallbacks
 // =========================================================================
+const gltfLoader = new GLTFLoader();
+const loadedModels = {
+  wallet: null,
+  reactor: null,
+  validator: null,
+  dao: null,
+  liquidity: null
+};
+
+// Preload Blender GLB models
+function preloadModels(callback) {
+  const models = [
+    { key: 'reactor', path: 'models/multihopper_reactor.glb' },
+    { key: 'wallet', path: 'models/wallet.glb' },
+    { key: 'validator', path: 'models/validator_node.glb' },
+    { key: 'dao', path: 'models/dao_cluster.glb' },
+    { key: 'liquidity', path: 'models/liquidity_pool.glb' }
+  ];
+
+  let loaded = 0;
+  models.forEach(m => {
+    gltfLoader.load(m.path, (gltf) => {
+      loadedModels[m.key] = gltf.scene;
+      loaded++;
+      if (loaded === models.length) {
+        state.modelsLoaded = true;
+        console.log('[+] All Blender 5.2 & ERAVEX GLTF assets loaded.');
+        if (callback) callback();
+      }
+    }, undefined, () => {
+      loaded++;
+      if (loaded === models.length && callback) callback();
+    });
+  });
+}
+
 const nodeGroup = new THREE.Group();
 const curveGroup = new THREE.Group();
 const particleGroup = new THREE.Group();
@@ -313,8 +470,9 @@ let nodes = [];
 let curves = [];
 let particleSystems = [];
 let cometStreams = [];
+let animatedSubpieces = [];
 
-// Crisp High-DPI Canvas Text Sprite Generator
+// Crisp High-DPI Canvas Text Sprite Generator (Space Grotesk + JetBrains Mono)
 function createHoloTextSprite(text, subtext, colorHex) {
   const c = document.createElement('canvas');
   c.width = 512;
@@ -355,11 +513,10 @@ function createHoloTextSprite(text, subtext, colorHex) {
   return sprite;
 }
 
-// Ultra-Realistic Physically-Based Optical Glass Crystal Node
+// Procedural Crystal Node (PBR Optical Glass)
 function createCrystalNode(geometry, colorHex, radius = 1.0) {
   const group = new THREE.Group();
   
-  // 1. Refractive Optical Glass Core (Physical transmission & internal caustic dispersion)
   const glassMat = new THREE.MeshPhysicalMaterial({
     color: colorHex,
     emissive: colorHex,
@@ -376,7 +533,6 @@ function createCrystalNode(geometry, colorHex, radius = 1.0) {
   const core = new THREE.Mesh(geometry, glassMat);
   group.add(core);
 
-  // 2. High-Tech Internal Energy Core (Small additive pulsing inner sphere)
   const innerCoreGeo = new THREE.SphereGeometry(radius * 0.42, 16, 16);
   const innerCoreMat = new THREE.MeshBasicMaterial({
     color: colorHex,
@@ -386,7 +542,6 @@ function createCrystalNode(geometry, colorHex, radius = 1.0) {
   const innerCore = new THREE.Mesh(innerCoreGeo, innerCoreMat);
   group.add(innerCore);
 
-  // 3. Precision Wireframe Exoskeleton
   const wireMat = new THREE.MeshBasicMaterial({
     color: colorHex,
     wireframe: true,
@@ -397,7 +552,6 @@ function createCrystalNode(geometry, colorHex, radius = 1.0) {
   wire.scale.setScalar(1.24);
   group.add(wire);
 
-  // 4. Outer Gyroscopic Orbit Ring
   const ringGeo = new THREE.TorusGeometry(radius * 1.45, 0.02, 16, 64);
   const ringMat = new THREE.MeshBasicMaterial({
     color: colorHex,
@@ -412,11 +566,7 @@ function createCrystalNode(geometry, colorHex, radius = 1.0) {
 }
 
 function rebuildTopology(hops) {
-  // Safe disposal of previous geometry & material to prevent GPU memory leaks
-  while (nodeGroup.children.length > 0) {
-    const c = nodeGroup.children[0];
-    nodeGroup.remove(c);
-  }
+  while (nodeGroup.children.length > 0) nodeGroup.remove(nodeGroup.children[0]);
   while (curveGroup.children.length > 0) curveGroup.remove(curveGroup.children[0]);
   while (particleGroup.children.length > 0) particleGroup.remove(particleGroup.children[0]);
   while (labelGroup.children.length > 0) labelGroup.remove(labelGroup.children[0]);
@@ -425,23 +575,107 @@ function rebuildTopology(hops) {
   curves = [];
   particleSystems = [];
   cometStreams = [];
+  animatedSubpieces = [];
 
-  // Origin: User Wallet Node (Left)
-  const originPos = new THREE.Vector3(-18, 0, 0);
-  const originNode = createCrystalNode(new THREE.IcosahedronGeometry(1.3, 1), 0x9945ff, 1.3);
-  originNode.group.position.copy(originPos);
-  nodeGroup.add(originNode.group);
+  // 1. Origin: User Wallet Node (Left, offset clear of sidebar)
+  const originPos = new THREE.Vector3(-13.5, 0, 0);
+  let originNode;
+  if (loadedModels.wallet) {
+    const walletScene = loadedModels.wallet.clone();
+    walletScene.scale.setScalar(2.2);
+    walletScene.position.copy(originPos);
+    
+    // Find representative mesh for raycasting
+    let hitMesh = null;
+    walletScene.traverse((c) => {
+      if (c.isMesh) {
+        c.material = new THREE.MeshPhysicalMaterial({
+          color: 0x9945ff,
+          emissive: 0x9945ff,
+          emissiveIntensity: 0.25,
+          roughness: 0.2,
+          metalness: 0.7,
+          clearcoat: 0.8
+        });
+        if (!hitMesh) hitMesh = c;
+      }
+    });
+    nodeGroup.add(walletScene);
+    originNode = { group: walletScene, core: hitMesh || walletScene };
+  } else {
+    originNode = createCrystalNode(new THREE.IcosahedronGeometry(1.3, 1), 0x9945ff, 1.3);
+    originNode.group.position.copy(originPos);
+    nodeGroup.add(originNode.group);
+  }
   nodes.push({ id: 'origin', pos: originPos, label: 'ORIGIN', mesh: originNode });
 
   const originSprite = createHoloTextSprite('ORIGIN', 'Phantom Wallet', '#9945ff');
   originSprite.position.set(originPos.x, originPos.y + 2.5, originPos.z);
   labelGroup.add(originSprite);
 
-  // Vault Minter Node (Center-Left)
-  const vaultPos = new THREE.Vector3(-8, 3, 2);
-  const vaultNode = createCrystalNode(new THREE.DodecahedronGeometry(1.8, 1), 0x00f2fe, 1.8);
-  vaultNode.group.position.copy(vaultPos);
-  nodeGroup.add(vaultNode.group);
+  // 2. Vault Minter Node (Center-Left: Bespoke Blender 5.2 MultiHopper Kinetic Reactor)
+  const vaultPos = new THREE.Vector3(-4.5, 3, 1.5);
+  let vaultNode;
+  if (loadedModels.reactor) {
+    const reactorScene = loadedModels.reactor.clone();
+    reactorScene.scale.setScalar(1.55);
+    reactorScene.position.copy(vaultPos);
+
+    let hitMesh = null;
+    let ringOuter = null;
+    let ringMid = null;
+    let ringInner = null;
+    let coreCrystal = null;
+    let singularity = null;
+
+    reactorScene.traverse((c) => {
+      if (c.isMesh) {
+        if (!hitMesh) hitMesh = c;
+        if (c.name.includes('Orbital_Ring_Outer')) ringOuter = c;
+        else if (c.name.includes('Orbital_Ring_Mid')) ringMid = c;
+        else if (c.name.includes('Orbital_Ring_Inner')) ringInner = c;
+        else if (c.name.includes('Reactor_Core_Crystal')) coreCrystal = c;
+        else if (c.name.includes('Reactor_Inner_Singularity')) singularity = c;
+      }
+    });
+
+    nodeGroup.add(reactorScene);
+    vaultNode = { group: reactorScene, core: hitMesh || reactorScene };
+    animatedSubpieces.push({
+      type: 'multihopper_reactor',
+      obj: reactorScene,
+      ringOuter, ringMid, ringInner, coreCrystal, singularity
+    });
+  } else if (loadedModels.validator) {
+    const valScene = loadedModels.validator.clone();
+    valScene.scale.setScalar(0.48);
+    valScene.position.copy(vaultPos);
+
+    let valMesh = null;
+    let orbs = [];
+    valScene.traverse((c) => {
+      if (c.isMesh) {
+        c.material = new THREE.MeshPhysicalMaterial({
+          color: 0x00f2fe,
+          emissive: 0x00f2fe,
+          emissiveIntensity: 0.22,
+          roughness: 0.15,
+          metalness: 0.4,
+          transmission: 0.5,
+          ior: 1.5
+        });
+        if (!valMesh) valMesh = c;
+        if (c.name.includes('Orb')) orbs.push(c);
+      }
+    });
+    nodeGroup.add(valScene);
+    vaultNode = { group: valScene, core: valMesh || valScene, subOrbs: orbs };
+    animatedSubpieces.push({ type: 'validator', obj: valScene, orbs });
+  } else {
+    vaultNode = createCrystalNode(new THREE.DodecahedronGeometry(1.8, 1), 0x00f2fe, 1.8);
+    vaultNode.group.position.copy(vaultPos);
+    nodeGroup.add(vaultNode.group);
+  }
   nodes.push({ id: 'vault', pos: vaultPos, label: 'VAULT', mesh: vaultNode });
 
   const vaultSprite = createHoloTextSprite('CORE PDA', 'Token-2022 Escrow', '#00f2fe');
@@ -451,12 +685,12 @@ function rebuildTopology(hops) {
   // Connect Origin -> Vault
   createRouteCurve(originPos, vaultPos, 0x9945ff);
 
-  // Intermediate Sequenced Hops
+  // 3. Intermediate Sequenced Hops (MultiHopper Acid Lime Crystals)
   let lastPos = vaultPos;
-  const hopStepX = 20 / (hops + 1);
+  const hopStepX = 21 / (hops + 1);
   for (let i = 1; i <= hops; i++) {
     const angle = (i / (hops + 1)) * Math.PI;
-    const x = -8 + (i * hopStepX);
+    const x = -4.5 + (i * hopStepX);
     const y = Math.sin(angle) * 3.8 + 1;
     const z = Math.cos(angle) * 3.8 - 2;
     const hopPos = new THREE.Vector3(x, y, z);
@@ -474,11 +708,35 @@ function rebuildTopology(hops) {
     lastPos = hopPos;
   }
 
-  // Final Redemptions: Split Destinations (Right)
-  const dest1Pos = new THREE.Vector3(18, 2, -3);
-  const dest1Node = createCrystalNode(new THREE.IcosahedronGeometry(1.2, 1), 0x00f2fe, 1.2);
-  dest1Node.group.position.copy(dest1Pos);
-  nodeGroup.add(dest1Node.group);
+  // 4. Final Redemptions: Split Destinations (Right: Sculpted DAO Treasury & Liquidity Pool)
+  const dest1Pos = new THREE.Vector3(17.5, 2, -3);
+  let dest1Node;
+  if (loadedModels.dao) {
+    const daoScene = loadedModels.dao.clone();
+    daoScene.scale.setScalar(0.28);
+    daoScene.position.copy(dest1Pos);
+
+    let daoMesh = null;
+    daoScene.traverse((c) => {
+      if (c.isMesh) {
+        c.material = new THREE.MeshPhysicalMaterial({
+          color: 0x00f2fe,
+          emissive: 0x00f2fe,
+          emissiveIntensity: 0.22,
+          roughness: 0.25,
+          metalness: 0.6,
+          clearcoat: 0.6
+        });
+        if (!daoMesh) daoMesh = c;
+      }
+    });
+    nodeGroup.add(daoScene);
+    dest1Node = { group: daoScene, core: daoMesh || daoScene };
+  } else {
+    dest1Node = createCrystalNode(new THREE.IcosahedronGeometry(1.2, 1), 0x00f2fe, 1.2);
+    dest1Node.group.position.copy(dest1Pos);
+    nodeGroup.add(dest1Node.group);
+  }
   nodes.push({ id: 'dest-a', pos: dest1Pos, label: 'TREASURY', mesh: dest1Node });
 
   const dest1Sprite = createHoloTextSprite('TREASURY', '60% Settled', '#00f2fe');
@@ -486,10 +744,34 @@ function rebuildTopology(hops) {
   labelGroup.add(dest1Sprite);
   createRouteCurve(lastPos, dest1Pos, 0x00f2fe);
 
-  const dest2Pos = new THREE.Vector3(18, -2, 4);
-  const dest2Node = createCrystalNode(new THREE.IcosahedronGeometry(1.1, 1), 0xD4F83A, 1.1);
-  dest2Node.group.position.copy(dest2Pos);
-  nodeGroup.add(dest2Node.group);
+  const dest2Pos = new THREE.Vector3(17.5, -2, 4);
+  let dest2Node;
+  if (loadedModels.liquidity) {
+    const liqScene = loadedModels.liquidity.clone();
+    liqScene.scale.setScalar(0.38);
+    liqScene.position.copy(dest2Pos);
+
+    let liqMesh = null;
+    liqScene.traverse((c) => {
+      if (c.isMesh) {
+        c.material = new THREE.MeshPhysicalMaterial({
+          color: 0xD4F83A,
+          emissive: 0xD4F83A,
+          emissiveIntensity: 0.24,
+          roughness: 0.15,
+          metalness: 0.5,
+          clearcoat: 0.8
+        });
+        if (!liqMesh) liqMesh = c;
+      }
+    });
+    nodeGroup.add(liqScene);
+    dest2Node = { group: liqScene, core: liqMesh || liqScene };
+  } else {
+    dest2Node = createCrystalNode(new THREE.IcosahedronGeometry(1.1, 1), 0xD4F83A, 1.1);
+    dest2Node.group.position.copy(dest2Pos);
+    nodeGroup.add(dest2Node.group);
+  }
   nodes.push({ id: 'dest-b', pos: dest2Pos, label: 'CONTRIBUTOR', mesh: dest2Node });
 
   const dest2Sprite = createHoloTextSprite('CONTRIBUTOR', '40% Settled', '#D4F83A');
@@ -513,7 +795,7 @@ function createRouteCurve(start, end, colorHex) {
   const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
   curves.push(curve);
 
-  // 1. Inner Luminous Core Path
+  // Inner Luminous Conduit
   const coreTubeGeo = new THREE.TubeGeometry(curve, 48, 0.05, 8, false);
   const coreTubeMat = new THREE.MeshBasicMaterial({
     color: colorHex,
@@ -523,7 +805,7 @@ function createRouteCurve(start, end, colorHex) {
   const coreTube = new THREE.Mesh(coreTubeGeo, coreTubeMat);
   curveGroup.add(coreTube);
 
-  // 2. Outer Translucent Plasma Sheath
+  // Outer Translucent Plasma Sheath
   const outerTubeGeo = new THREE.TubeGeometry(curve, 36, 0.12, 8, false);
   const outerTubeMat = new THREE.MeshBasicMaterial({
     color: colorHex,
@@ -534,7 +816,7 @@ function createRouteCurve(start, end, colorHex) {
   const outerTube = new THREE.Mesh(outerTubeGeo, outerTubeMat);
   curveGroup.add(outerTube);
 
-  // 3. Flowing Ambient Particles
+  // Flowing Particles
   const count = 30;
   const pGeo = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3);
@@ -562,7 +844,7 @@ function createRouteCurve(start, end, colorHex) {
   particleGroup.add(pSystem);
   particleSystems.push({ system: pSystem, curve, offsets, count });
 
-  // 4. High-Energy Comet Head (Fast moving packet pulse)
+  // High-Energy Comet Head (Fast moving cryptographic packet)
   const cometGeo = new THREE.SphereGeometry(0.24, 16, 16);
   const cometMat = new THREE.MeshBasicMaterial({
     color: 0xffffff,
@@ -587,14 +869,52 @@ window.addEventListener('mousemove', (e) => {
   mouse.ndcY = -(e.clientY / window.innerHeight) * 2 + 1;
 });
 
+// =========================================================================
+// ERAVEX STUDIO DIRECTOR: CINEMATIC CAMERA CHOREOGRAPHER
+// =========================================================================
+const cameraDirector = {
+  active: false,
+  targetCamPos: new THREE.Vector3(),
+  targetLookAt: new THREE.Vector3(),
+  homeCamPos: new THREE.Vector3(0, 8, 30),
+  homeLookAt: new THREE.Vector3(0, 0, 0),
+  dampFactor: 3.2,
+
+  focusOn(node) {
+    this.active = true;
+    this.targetLookAt.copy(node.pos);
+    const offset = new THREE.Vector3(
+      node.pos.x > 0 ? -5.5 : 5.5,
+      2.8,
+      8.5
+    );
+    this.targetCamPos.copy(node.pos).add(offset);
+  },
+
+  reset() {
+    this.active = true;
+    this.targetCamPos.copy(this.homeCamPos);
+    this.targetLookAt.copy(this.homeLookAt);
+  },
+
+  update(delta) {
+    if (!this.active) return;
+    camera.position.lerp(this.targetCamPos, Math.min(delta * this.dampFactor, 1.0));
+    controls.target.lerp(this.targetLookAt, Math.min(delta * this.dampFactor, 1.0));
+    if (camera.position.distanceTo(this.targetCamPos) < 0.15 && controls.target.distanceTo(this.targetLookAt) < 0.15) {
+      this.active = false;
+    }
+  }
+};
+
 // Interactive Click to Focus Camera on Node
 window.addEventListener('click', (e) => {
-  // If clicking UI controls, ignore
   if (e.target.closest('aside, header, .decompile-terminal, .ai-dispatcher')) return;
   if (state.hoveredNode) {
     sound.click(1400);
-    // Smoothly glide controls target to the node
-    controls.target.copy(state.hoveredNode.pos);
+    cameraDirector.focusOn(state.hoveredNode);
+  } else {
+    cameraDirector.reset();
   }
 });
 
@@ -623,6 +943,11 @@ function animate() {
     lastFpsCheck = time;
   }
 
+  // Update Procedural Shaders & Director
+  floorMat.uniforms.uTime.value = time;
+  LuxuryCinematicShader.uniforms.uTime.value = time;
+  cameraDirector.update(delta);
+
   // Slow Starfield Cosmic Drift
   starfield.rotation.y = time * 0.015;
   starfield.rotation.x = time * 0.008;
@@ -640,13 +965,31 @@ function animate() {
 
   // Rotate Nodes & Gyro Rings
   nodes.forEach((n, idx) => {
-    if (n.mesh) {
+    if (n.mesh && n.mesh.gyroRing) {
       n.mesh.core.rotation.y += 0.75 * delta;
       n.mesh.wire.rotation.x -= 0.4 * delta;
       n.mesh.wire.rotation.z += 0.3 * delta;
       n.mesh.gyroRing.rotation.z += 0.9 * delta;
       n.mesh.innerCore.scale.setScalar(1.0 + Math.sin(time * 3 + idx) * 0.15);
       n.mesh.group.position.y += Math.sin(time * 2 + idx) * 0.0025;
+    } else if (n.mesh && n.mesh.group) {
+      n.mesh.group.rotation.y += 0.5 * delta;
+      n.mesh.group.position.y += Math.sin(time * 2 + idx) * 0.0025;
+    }
+  });
+
+  // Rotate Sculpted Blender & ERAVEX Subpieces (MultiHopper Kinetic Reactor)
+  animatedSubpieces.forEach(sp => {
+    if (sp.type === 'multihopper_reactor') {
+      if (sp.ringOuter) sp.ringOuter.rotation.z += 0.35 * delta;
+      if (sp.ringMid) sp.ringMid.rotation.x += 0.55 * delta;
+      if (sp.ringInner) sp.ringInner.rotation.y -= 0.85 * delta;
+      if (sp.coreCrystal) sp.coreCrystal.rotation.y += 0.4 * delta;
+      if (sp.singularity) sp.singularity.scale.setScalar(1.0 + Math.sin(time * 4.0) * 0.18);
+    } else if (sp.type === 'validator' && sp.orbs) {
+      sp.orbs.forEach((orb, i) => {
+        orb.rotation.y += (i % 2 === 0 ? 0.8 : -0.8) * delta;
+      });
     }
   });
 
@@ -664,7 +1007,7 @@ function animate() {
     ps.system.geometry.attributes.position.needsUpdate = true;
   });
 
-  // Dynamic Billboard Elevation Pitch-Fade (Prevents labels from covering 3D crystal nodes)
+  // Dynamic Billboard Elevation Pitch-Fade
   const pitch = Math.abs(camera.position.y / Math.max(camera.position.length(), 1.0));
   labelGroup.children.forEach(sprite => {
     if (pitch > 0.45) {
@@ -684,12 +1027,12 @@ function animate() {
 
   // Interactive Raycasting Check
   raycaster.setFromCamera(new THREE.Vector2(mouse.ndcX, mouse.ndcY), camera);
-  const coreMeshes = nodes.map(n => n.mesh.core);
-  const intersects = raycaster.intersectObjects(coreMeshes);
+  const coreMeshes = nodes.map(n => n.mesh.core).filter(Boolean);
+  const intersects = raycaster.intersectObjects(coreMeshes, true);
 
   if (intersects.length > 0) {
-    const hitMesh = intersects[0].object;
-    const hitNode = nodes.find(n => n.mesh.core === hitMesh);
+    let hitMesh = intersects[0].object;
+    let hitNode = nodes.find(n => n.mesh.core === hitMesh || (n.mesh.group && n.mesh.group.contains && n.mesh.group.contains(hitMesh)));
 
     if (hitNode && state.hoveredNode !== hitNode) {
       state.hoveredNode = hitNode;
@@ -818,6 +1161,7 @@ sliderHops.addEventListener('input', (e) => {
   hopsLabel.innerText = `${val} Hops (Staggered ${val * 10}s)`;
   statHops.innerText = `${val} HOPS`;
   sound.click(600 + val * 150);
+  cameraDirector.reset();
   rebuildTopology(val);
 });
 
@@ -880,8 +1224,8 @@ btnWallet.addEventListener('click', async () => {
         state.publicKey = resp.publicKey.toString();
         const shortKey = `${state.publicKey.slice(0, 4)}...${state.publicKey.slice(-4)}`;
         btnWallet.innerText = shortKey;
-        btnWallet.style.background = '#14f195';
-        btnWallet.style.color = '#06080d';
+        btnWallet.style.background = '#D4F83A';
+        btnWallet.style.color = '#07090e';
         sound.chord();
         console.log('[+] Phantom Connected:', state.publicKey);
       } else {
@@ -889,8 +1233,8 @@ btnWallet.addEventListener('click', async () => {
         state.walletConnected = false;
         state.publicKey = null;
         btnWallet.innerText = state.isMobile ? 'CONNECT' : 'CONNECT PHANTOM';
-        btnWallet.style.background = 'linear-gradient(135deg, #9945ff, #14f195)';
-        btnWallet.style.color = '#06080d';
+        btnWallet.style.background = 'linear-gradient(135deg, #9945ff, #D4F83A)';
+        btnWallet.style.color = '#07090e';
         sound.click(500);
       }
     } catch (err) {
@@ -905,7 +1249,7 @@ btnWallet.addEventListener('click', async () => {
 btnSimulate.addEventListener('click', () => {
   state.simulating = true;
   btnSimulate.innerText = 'SIMULATING...';
-  btnSimulate.style.borderColor = '#14f195';
+  btnSimulate.style.borderColor = '#D4F83A';
   sound.chord();
   
   setTimeout(() => {
@@ -995,6 +1339,9 @@ if (window.SyndicateRecorder) {
   });
 }
 
-// Initial build & launch
+// Initial build & launch with Blender GLTF preloading
+preloadModels(() => {
+  rebuildTopology(state.hopsCount);
+});
 rebuildTopology(state.hopsCount);
 animate();
