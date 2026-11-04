@@ -198,9 +198,9 @@ composer.addPass(renderPass);
 
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.65, // bloom strength
-  0.45, // bloom radius
-  0.35  // bloom threshold
+  0.28, // calibrated bloom strength (subtle, crisp edge speculars)
+  0.28, // tight bloom radius (eliminates washout light bleed)
+  0.78  // high bloom threshold (only laser sparks & diodes bloom)
 );
 composer.addPass(bloomPass);
 
@@ -378,9 +378,9 @@ const floorMat = new THREE.ShaderMaterial({
       float fade = smoothstep(45.0, 3.0, dist);
 
       vec3 causticColor = mix(uColorA, uColorB, caustics);
-      vec3 finalColor = mix(uDarkFloor, causticColor, caustics * fade * 0.38);
+      vec3 finalColor = mix(uDarkFloor, causticColor, caustics * fade * 0.12);
 
-      gl_FragColor = vec4(finalColor, fade * 0.85);
+      gl_FragColor = vec4(finalColor, fade * 0.70);
     }
   `,
   transparent: true,
@@ -531,7 +531,8 @@ function createHoloTextSprite(text, subtext, colorHex) {
     map: tex,
     transparent: true,
     opacity: 0.95,
-    depthTest: false
+    depthTest: true,
+    depthWrite: false
   });
   const sprite = new THREE.Sprite(spriteMat);
   sprite.scale.set(3.8, 1.07, 1.0);
@@ -955,9 +956,9 @@ const cameraDirector = {
     this.active = true;
     this.targetLookAt.copy(node.pos);
     const offset = new THREE.Vector3(
-      node.pos.x > 0 ? -5.5 : 5.5,
-      2.8,
-      8.5
+      node.pos.x > 0 ? -4.0 : 4.0,
+      3.2,
+      12.5
     );
     this.targetCamPos.copy(node.pos).add(offset);
   },

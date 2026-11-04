@@ -34,48 +34,48 @@ def build_multihopper_reactor():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # 1. Materials
-    # MultiHopper Acid Lime Accent
+    # MultiHopper Acid Lime Accent (Controlled luminescence, sharp edge definition)
     mat_lime = create_material(
         "MH_AcidLime",
         base_color=(0.83, 0.97, 0.23, 1.0),
-        metallic=0.7,
-        roughness=0.15,
+        metallic=0.8,
+        roughness=0.2,
         emission=(0.83, 0.97, 0.23, 1.0),
-        emission_strength=3.5
+        emission_strength=1.2
     )
     # Solana Electric Cyan
     mat_cyan = create_material(
         "MH_Cyan",
         base_color=(0.0, 0.95, 1.0, 1.0),
-        metallic=0.5,
-        roughness=0.15,
+        metallic=0.7,
+        roughness=0.2,
         emission=(0.0, 0.95, 1.0, 1.0),
-        emission_strength=2.8
+        emission_strength=1.0
     )
     # Solana Royal Purple
     mat_purple = create_material(
         "MH_Purple",
         base_color=(0.6, 0.27, 1.0, 1.0),
-        metallic=0.6,
-        roughness=0.2,
+        metallic=0.7,
+        roughness=0.25,
         emission=(0.6, 0.27, 1.0, 1.0),
-        emission_strength=2.2
+        emission_strength=0.9
     )
-    # Titanium Carbon Obsidian
+    # Titanium Carbon Obsidian (Deep metallic body with crisp specularity)
     mat_titanium = create_material(
         "MH_Titanium",
-        base_color=(0.04, 0.05, 0.07, 1.0),
-        metallic=0.95,
-        roughness=0.18
+        base_color=(0.03, 0.04, 0.06, 1.0),
+        metallic=0.98,
+        roughness=0.22
     )
-    # Crystalline Diamond Core
+    # Crystalline Diamond Core (Refractive faceted diamond, subtle inner glow)
     mat_crystal = create_material(
         "MH_CoreCrystal",
-        base_color=(0.95, 1.0, 0.95, 1.0),
-        metallic=0.1,
-        roughness=0.04,
+        base_color=(0.95, 1.0, 0.98, 1.0),
+        metallic=0.05,
+        roughness=0.05,
         emission=(0.83, 0.97, 0.23, 1.0),
-        emission_strength=1.5
+        emission_strength=0.4
     )
 
     # Root Hierarchy Empty

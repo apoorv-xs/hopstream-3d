@@ -31,28 +31,28 @@ def build_timelock_relay():
     reset_scene()
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # 1. Materials
+    # 1. Materials (Crisp obsidian geometry with fine luminous seams)
     mat_lime = create_material(
         "Relay_Lime",
         base_color=(0.83, 0.97, 0.23, 1.0),
-        metallic=0.7,
-        roughness=0.15,
+        metallic=0.8,
+        roughness=0.2,
         emission=(0.83, 0.97, 0.23, 1.0),
-        emission_strength=2.8
+        emission_strength=0.9
     )
     mat_carbon = create_material(
         "Relay_Carbon",
-        base_color=(0.06, 0.08, 0.11, 1.0),
-        metallic=0.92,
-        roughness=0.2
+        base_color=(0.04, 0.05, 0.07, 1.0),
+        metallic=0.96,
+        roughness=0.25
     )
     mat_crystal = create_material(
         "Relay_Glass",
-        base_color=(0.9, 1.0, 0.9, 1.0),
+        base_color=(0.92, 0.98, 0.92, 1.0),
         metallic=0.1,
-        roughness=0.08,
+        roughness=0.06,
         emission=(0.83, 0.97, 0.23, 1.0),
-        emission_strength=1.2
+        emission_strength=0.35
     )
 
     root = bpy.data.objects.new("Relay_Root", None)
