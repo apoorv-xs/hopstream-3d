@@ -3,9 +3,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 // =========================================================================
 // HOPSTREAM 3D // BLENDER & ERAVEX STUDIO BESPOKE GLTF ENGINE
@@ -242,6 +244,7 @@ function adjustCameraForViewport() {
     camera.position.set(2, 14, 28);
     controls.target.set(1, 1, 0);
   }
+  controls.update();
 }
 adjustCameraForViewport();
 
@@ -251,6 +254,16 @@ adjustCameraForViewport();
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
+
+// Cinema Lens Depth of Field (True Optical Bokeh)
+const bokehPass = new BokehPass(scene, camera, {
+  focus: 28.0,
+  aperture: 0.00018,
+  maxblur: 0.008,
+  width: window.innerWidth,
+  height: window.innerHeight
+});
+composer.addPass(bokehPass);
 
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
@@ -392,7 +405,7 @@ function createAtmosphericMotes() {
 
   for (let i = 0; i < count; i++) {
     positions[i * 3] = (Math.random() - 0.5) * 44;
-    positions[i * 3 + 1] = Math.random() * 14 - 3.8;
+    positions[i * 3 + 1] = Math.random() * 12 - 2.2;
     positions[i * 3 + 2] = (Math.random() - 0.5) * 28;
 
     velocities[i * 3] = (Math.random() - 0.5) * 0.006;
@@ -416,12 +429,7 @@ function createAtmosphericMotes() {
 }
 const atmosphericMotes = createAtmosphericMotes();
 
-// 3.2 Cybernetic Ground Grid & Concentric MultiHopper Swirl Rings
-const gridHelper = new THREE.GridHelper(80, 60, 0x00f2fe, 0x111827);
-gridHelper.position.y = -4;
-scene.add(gridHelper);
-
-// ERAVEX Studio Procedural Wavefront Caustics Floor
+// 3.2 Monolithic Dark Obsidian Mirror Floor (ERAVEX Studio Caustics Falloff)
 const floorGeo = new THREE.PlaneGeometry(100, 100, 32, 32);
 floorGeo.rotateX(-Math.PI / 2);
 const floorMat = new THREE.ShaderMaterial({
@@ -479,23 +487,6 @@ const floorMesh = new THREE.Mesh(floorGeo, floorMat);
 floorMesh.position.y = -4.01;
 scene.add(floorMesh);
 
-const radarGroup = new THREE.Group();
-radarGroup.position.set(-5, -3.95, 2);
-radarGroup.rotation.x = -Math.PI / 2;
-
-[6, 12, 18, 24, 30].forEach((radius, i) => {
-  const ringGeo = new THREE.RingGeometry(radius - 0.04, radius + 0.04, 64);
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: i % 2 === 0 ? 0xD4F83A : 0x00f2fe,
-    transparent: true,
-    opacity: 0.24 - (i * 0.03),
-    side: THREE.DoubleSide
-  });
-  const ring = new THREE.Mesh(ringGeo, ringMat);
-  radarGroup.add(ring);
-});
-scene.add(radarGroup);
-
 // 3.3 Interactive Target Reticle (snaps to hovered 3D nodes)
 const reticleGeo = new THREE.RingGeometry(1.6, 1.7, 32);
 const reticleMat = new THREE.MeshBasicMaterial({
@@ -511,7 +502,11 @@ scene.add(reticleMesh);
 // 4. Bespoke Blender 5.2 glTF Models & Procedural Fallbacks
 // =========================================================================
 const gltfLoader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+gltfLoader.setDRACOLoader(dracoLoader);
 const loadedModels = {
+  chassis: null,
   wallet: null,
   reactor: null,
   relay: null,
@@ -523,6 +518,7 @@ const loadedModels = {
 // Preload Blender GLB models
 function preloadModels(callback) {
   const models = [
+    { key: 'chassis', path: 'models/quantum_chassis.glb' },
     { key: 'reactor', path: 'models/multihopper_reactor.glb' },
     { key: 'relay', path: 'models/multihopper_relay.glb' },
     { key: 'wallet', path: 'models/wallet.glb' },
@@ -534,6 +530,7 @@ function preloadModels(callback) {
   let loaded = 0;
   models.forEach(m => {
     gltfLoader.load(m.path, (gltf) => {
+      console.log('[+] Loaded GLTF model successfully:', m.key, m.path);
       loadedModels[m.key] = gltf.scene;
       loaded++;
       if (loaded === models.length) {
@@ -541,7 +538,8 @@ function preloadModels(callback) {
         console.log('[+] All Blender 5.2 & ERAVEX GLTF assets loaded.');
         if (callback) callback();
       }
-    }, undefined, () => {
+    }, undefined, (err) => {
+      console.error('[-] FAILED to load GLTF model:', m.key, m.path, err);
       loaded++;
       if (loaded === models.length && callback) callback();
     });
@@ -632,19 +630,19 @@ function createHoloTextSprite(text, subtext, colorHex) {
 // Dynamic Shockwave Ripples (Visual Feedback on Simulation & Clicks)
 const shockwaves = [];
 function triggerShockwave(pos, colorHex) {
-  const geo = new THREE.RingGeometry(0.1, 0.28, 36);
+  const geo = new THREE.RingGeometry(0.12, 0.22, 36);
   geo.rotateX(-Math.PI / 2);
   const mat = new THREE.MeshBasicMaterial({
     color: colorHex,
     transparent: true,
-    opacity: 0.95,
+    opacity: 0.85,
     side: THREE.DoubleSide
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.copy(pos);
   mesh.position.y -= 0.3;
   scene.add(mesh);
-  shockwaves.push({ mesh, radius: 0.28, opacity: 0.95 });
+  shockwaves.push({ mesh, radius: 0.28, opacity: 0.85 });
 
   // Tactile impulse camera shake & acoustic sub-impact
   cameraDirector.shake(0.16);
@@ -708,6 +706,13 @@ function rebuildTopology(hops) {
   while (curveGroup.children.length > 0) curveGroup.remove(curveGroup.children[0]);
   while (particleGroup.children.length > 0) particleGroup.remove(particleGroup.children[0]);
   while (labelGroup.children.length > 0) labelGroup.remove(labelGroup.children[0]);
+
+  shockwaves.forEach(sw => {
+    scene.remove(sw.mesh);
+    if (sw.mesh.geometry) sw.mesh.geometry.dispose();
+    if (sw.mesh.material) sw.mesh.material.dispose();
+  });
+  shockwaves.length = 0;
   
   nodes = [];
   curves = [];
@@ -715,6 +720,19 @@ function rebuildTopology(hops) {
   cometStreams = [];
   animatedSubpieces = [];
   plasmaConduits = [];
+
+  // 0. Physical Monolithic Routing Chassis (The Solana Quantum Blade)
+  if (loadedModels.chassis) {
+    const chassisScene = loadedModels.chassis.clone();
+    chassisScene.position.set(0, 0, 0);
+    chassisScene.traverse((c) => {
+      if (c.isMesh && c.material) {
+        c.castShadow = true;
+        c.receiveShadow = true;
+      }
+    });
+    nodeGroup.add(chassisScene);
+  }
 
   // 1. Origin: User Wallet Node (Left, offset clear of sidebar)
   const originPos = new THREE.Vector3(-13.5, 0, 0);
@@ -915,7 +933,7 @@ function rebuildTopology(hops) {
   let dest2Node;
   if (loadedModels.liquidity) {
     const liqScene = loadedModels.liquidity.clone();
-    liqScene.scale.setScalar(0.38);
+    liqScene.scale.setScalar(0.045);
     liqScene.position.copy(dest2Pos);
 
     let liqMesh = null;
@@ -1082,8 +1100,8 @@ const cameraDirector = {
   active: false,
   targetCamPos: new THREE.Vector3(),
   targetLookAt: new THREE.Vector3(),
-  homeCamPos: new THREE.Vector3(0, 8, 30),
-  homeLookAt: new THREE.Vector3(0, 0, 0),
+  homeCamPos: new THREE.Vector3(2, 14, 28),
+  homeLookAt: new THREE.Vector3(1, 1, 0),
   dampFactor: 3.2,
   shakeIntensity: 0,
 
@@ -1124,6 +1142,16 @@ const cameraDirector = {
       camera.position.x += shakeX;
       camera.position.y += shakeY;
       this.shakeIntensity *= Math.pow(0.06, delta);
+    }
+
+    // Dynamic Focal Plane Tracking for Optical Bokeh (active target tracking)
+    if (bokehPass && bokehPass.uniforms && bokehPass.uniforms['focus']) {
+      const targetDist = camera.position.distanceTo(controls.target);
+      bokehPass.uniforms['focus'].value = THREE.MathUtils.lerp(
+        bokehPass.uniforms['focus'].value,
+        targetDist,
+        0.1
+      );
     }
   }
 };
@@ -1183,7 +1211,7 @@ function animate() {
     motesPos[i * 3 + 1] += atmosphericMotes.velocities[i * 3 + 1];
     motesPos[i * 3 + 2] += atmosphericMotes.velocities[i * 3 + 2];
 
-    if (motesPos[i * 3 + 1] > 10.0) motesPos[i * 3 + 1] = -3.8;
+    if (motesPos[i * 3 + 1] > 10.0) motesPos[i * 3 + 1] = -2.2;
     if (Math.abs(motesPos[i * 3]) > 25.0) motesPos[i * 3] *= -0.9;
   }
   atmosphericMotes.points.geometry.attributes.position.needsUpdate = true;
@@ -1191,9 +1219,6 @@ function animate() {
   // Slow Starfield Cosmic Drift
   starfield.rotation.y = time * 0.015;
   starfield.rotation.x = time * 0.008;
-
-  // Concentric radar slow spin
-  radarGroup.rotation.z = time * 0.05;
 
   // Inertial Parallax Drift (Desktop only)
   if (!state.isMobile && !state.replaying) {
@@ -1240,11 +1265,11 @@ function animate() {
   // Animate Dynamic Shockwave Expansion
   for (let i = shockwaves.length - 1; i >= 0; i--) {
     const sw = shockwaves[i];
-    sw.radius += 8.5 * delta;
-    sw.opacity -= 1.3 * delta;
+    sw.radius += 5.5 * delta;
+    sw.opacity -= 2.6 * delta;
     sw.mesh.scale.setScalar(sw.radius);
     sw.mesh.material.opacity = Math.max(0, sw.opacity);
-    if (sw.opacity <= 0) {
+    if (sw.opacity <= 0 || sw.radius > 3.2) {
       scene.remove(sw.mesh);
       sw.mesh.geometry.dispose();
       sw.mesh.material.dispose();
