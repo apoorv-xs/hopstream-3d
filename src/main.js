@@ -425,6 +425,7 @@ const gltfLoader = new GLTFLoader();
 const loadedModels = {
   wallet: null,
   reactor: null,
+  relay: null,
   validator: null,
   dao: null,
   liquidity: null
@@ -434,6 +435,7 @@ const loadedModels = {
 function preloadModels(callback) {
   const models = [
     { key: 'reactor', path: 'models/multihopper_reactor.glb' },
+    { key: 'relay', path: 'models/multihopper_relay.glb' },
     { key: 'wallet', path: 'models/wallet.glb' },
     { key: 'validator', path: 'models/validator_node.glb' },
     { key: 'dao', path: 'models/dao_cluster.glb' },
@@ -472,36 +474,59 @@ let particleSystems = [];
 let cometStreams = [];
 let animatedSubpieces = [];
 
-// Crisp High-DPI Canvas Text Sprite Generator (Space Grotesk + JetBrains Mono)
+// Ultra-Crisp 1024x288 High-DPI Canvas Text Sprite Generator (Space Grotesk + JetBrains Mono + Status LED)
 function createHoloTextSprite(text, subtext, colorHex) {
   const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 144;
+  c.width = 1024;
+  c.height = 288;
   const ctx = c.getContext('2d');
 
-  // Background pill with subtle gradient
-  ctx.fillStyle = 'rgba(8, 12, 20, 0.85)';
+  // Background glass card with hairline gradient border
+  ctx.fillStyle = 'rgba(7, 11, 19, 0.88)';
   ctx.strokeStyle = colorHex;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 5;
   ctx.beginPath();
-  ctx.roundRect(8, 8, 496, 128, 18);
+  ctx.roundRect(16, 16, 992, 256, 32);
   ctx.fill();
   ctx.stroke();
 
+  // Specular top highlight line
+  const grad = ctx.createLinearGradient(32, 20, 992, 20);
+  grad.addColorStop(0, 'rgba(255,255,255,0.0)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.25)');
+  grad.addColorStop(1, 'rgba(255,255,255,0.0)');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(80, 24);
+  ctx.lineTo(944, 24);
+  ctx.stroke();
+
+  // Glowing cybernetic status LED dot
+  ctx.fillStyle = colorHex;
+  ctx.shadowColor = colorHex;
+  ctx.shadowBlur = 15;
+  ctx.beginPath();
+  ctx.arc(110, 110, 14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0; // reset shadow
+
   // Primary label with Space Grotesk
   ctx.fillStyle = colorHex;
-  ctx.font = 'bold 44px "Space Grotesk", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(text, 256, 62);
+  ctx.font = 'bold 82px "Space Grotesk", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(text, 150, 138);
 
   // Subtext with JetBrains Mono
   ctx.fillStyle = '#cbd5e1';
-  ctx.font = '600 24px "JetBrains Mono", monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(subtext, 256, 106);
+  ctx.font = '600 44px "JetBrains Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(subtext, 150, 218);
 
   const tex = new THREE.CanvasTexture(c);
-  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
   const spriteMat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
@@ -509,8 +534,26 @@ function createHoloTextSprite(text, subtext, colorHex) {
     depthTest: false
   });
   const sprite = new THREE.Sprite(spriteMat);
-  sprite.scale.set(3.8, 1.1, 1.0);
+  sprite.scale.set(3.8, 1.07, 1.0);
   return sprite;
+}
+
+// Dynamic Shockwave Ripples (Visual Feedback on Simulation & Clicks)
+const shockwaves = [];
+function triggerShockwave(pos, colorHex) {
+  const geo = new THREE.RingGeometry(0.1, 0.28, 36);
+  geo.rotateX(-Math.PI / 2);
+  const mat = new THREE.MeshBasicMaterial({
+    color: colorHex,
+    transparent: true,
+    opacity: 0.95,
+    side: THREE.DoubleSide
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(pos);
+  mesh.position.y -= 0.3;
+  scene.add(mesh);
+  shockwaves.push({ mesh, radius: 0.28, opacity: 0.95 });
 }
 
 // Procedural Crystal Node (PBR Optical Glass)
@@ -695,9 +738,37 @@ function rebuildTopology(hops) {
     const z = Math.cos(angle) * 3.8 - 2;
     const hopPos = new THREE.Vector3(x, y, z);
     
-    const hopNode = createCrystalNode(new THREE.OctahedronGeometry(1.0, 0), 0xD4F83A, 1.0);
-    hopNode.group.position.copy(hopPos);
-    nodeGroup.add(hopNode.group);
+    let hopNode;
+    if (loadedModels.relay) {
+      const relayScene = loadedModels.relay.clone();
+      relayScene.scale.setScalar(1.25);
+      relayScene.position.copy(hopPos);
+
+      let dialRing = null;
+      let innerCore = null;
+      let hitMesh = null;
+      relayScene.traverse((c) => {
+        if (c.isMesh) {
+          if (!hitMesh) hitMesh = c;
+          if (c.name.includes('Dial_Ring')) dialRing = c;
+          else if (c.name.includes('Inner_Core')) innerCore = c;
+        }
+      });
+
+      nodeGroup.add(relayScene);
+      hopNode = { group: relayScene, core: hitMesh || relayScene };
+      animatedSubpieces.push({
+        type: 'timelock_relay',
+        obj: relayScene,
+        dialRing,
+        innerCore,
+        idx: i
+      });
+    } else {
+      hopNode = createCrystalNode(new THREE.OctahedronGeometry(1.0, 0), 0xD4F83A, 1.0);
+      hopNode.group.position.copy(hopPos);
+      nodeGroup.add(hopNode.group);
+    }
     nodes.push({ id: `hop-${i}`, pos: hopPos, label: `HOP ${i}`, mesh: hopNode });
 
     const hopSprite = createHoloTextSprite(`RELAY ${i}`, 'Keeper Timelock', '#D4F83A');
@@ -978,7 +1049,7 @@ function animate() {
     }
   });
 
-  // Rotate Sculpted Blender & ERAVEX Subpieces (MultiHopper Kinetic Reactor)
+  // Rotate Sculpted Blender & ERAVEX Subpieces (MultiHopper Kinetic Reactor & Timelock Relayers)
   animatedSubpieces.forEach(sp => {
     if (sp.type === 'multihopper_reactor') {
       if (sp.ringOuter) sp.ringOuter.rotation.z += 0.35 * delta;
@@ -986,12 +1057,31 @@ function animate() {
       if (sp.ringInner) sp.ringInner.rotation.y -= 0.85 * delta;
       if (sp.coreCrystal) sp.coreCrystal.rotation.y += 0.4 * delta;
       if (sp.singularity) sp.singularity.scale.setScalar(1.0 + Math.sin(time * 4.0) * 0.18);
+    } else if (sp.type === 'timelock_relay') {
+      if (sp.dialRing) sp.dialRing.rotation.z += (sp.idx % 2 === 0 ? 0.95 : -0.95) * delta;
+      if (sp.innerCore) sp.innerCore.scale.setScalar(1.0 + Math.sin(time * 4.0 + sp.idx) * 0.22);
+      sp.obj.rotation.y += 0.4 * delta;
     } else if (sp.type === 'validator' && sp.orbs) {
       sp.orbs.forEach((orb, i) => {
         orb.rotation.y += (i % 2 === 0 ? 0.8 : -0.8) * delta;
       });
     }
   });
+
+  // Animate Dynamic Shockwave Expansion
+  for (let i = shockwaves.length - 1; i >= 0; i--) {
+    const sw = shockwaves[i];
+    sw.radius += 8.5 * delta;
+    sw.opacity -= 1.3 * delta;
+    sw.mesh.scale.setScalar(sw.radius);
+    sw.mesh.material.opacity = Math.max(0, sw.opacity);
+    if (sw.opacity <= 0) {
+      scene.remove(sw.mesh);
+      sw.mesh.geometry.dispose();
+      sw.mesh.material.dispose();
+      shockwaves.splice(i, 1);
+    }
+  }
 
   // Animate Particle Flows along Bezier Paths
   const speed = state.simulating || state.replaying ? 1.3 : 0.38;
@@ -1245,19 +1335,77 @@ btnWallet.addEventListener('click', async () => {
   }
 });
 
-// Simulate Button (Camera Flyover + Particle Burst + Audio)
-btnSimulate.addEventListener('click', () => {
+// ERAVEX Studio Choreographed On-Chain Execution Simulator
+async function runCinematicSimulation() {
+  if (state.simulating) return;
   state.simulating = true;
-  btnSimulate.innerText = 'SIMULATING...';
+  btnSimulate.innerText = 'EXECUTING...';
   btnSimulate.style.borderColor = '#D4F83A';
-  sound.chord();
-  
-  setTimeout(() => {
-    state.simulating = false;
-    btnSimulate.innerText = 'SIMULATE';
-    btnSimulate.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-  }, 4000);
-});
+  btnSimulate.style.color = '#D4F83A';
+
+  if (decompileTerminal) decompileTerminal.style.display = 'flex';
+  if (decompileBody) decompileBody.innerHTML = '';
+
+  const addLog = (text, status = 'pass') => {
+    if (!decompileBody) return;
+    const div = document.createElement('div');
+    const timeStr = `[00:0${(decompileBody.children.length * 0.75).toFixed(2)}]`;
+    div.innerHTML = `${timeStr} ${text} <span class="${status}">${status.toUpperCase()}</span>`;
+    decompileBody.appendChild(div);
+    decompileBody.scrollTop = decompileBody.scrollHeight;
+    sound.click(1000 + decompileBody.children.length * 120);
+  };
+
+  const wait = (ms) => new Promise(res => setTimeout(res, ms));
+
+  // Step 1: Origin
+  if (nodes[0]) {
+    cameraDirector.focusOn(nodes[0]);
+    triggerShockwave(nodes[0].pos, 0x9945ff);
+    addLog('Phantom Wallet: Auth Token-2022 Route Dispatch');
+  }
+  await wait(900);
+
+  // Step 2: Core PDA Escrow
+  const vault = nodes.find(n => n.id === 'vault');
+  if (vault) {
+    cameraDirector.focusOn(vault);
+    triggerShockwave(vault.pos, 0x00f2fe);
+    addLog(`Core Escrow PDA (${MULTIHOPPER_PROGRAMS.core.slice(0, 6)}...): ${state.amount} USDC Locked`);
+  }
+  await wait(1100);
+
+  // Step 3: Sequenced Hops
+  for (let i = 1; i <= state.hopsCount; i++) {
+    const hopNode = nodes.find(n => n.id === `hop-${i}`);
+    if (hopNode) {
+      cameraDirector.focusOn(hopNode);
+      triggerShockwave(hopNode.pos, 0xD4F83A);
+      addLog(`Relay #${i} Keeper Timelock: Delay ${i * 10}s Verified`);
+    }
+    await wait(950);
+  }
+
+  // Step 4: Split Settlement
+  const destA = nodes.find(n => n.id === 'dest-a');
+  const destB = nodes.find(n => n.id === 'dest-b');
+  if (destA && destB) {
+    triggerShockwave(destA.pos, 0x00f2fe);
+    triggerShockwave(destB.pos, 0xD4F83A);
+    addLog('Settlement: 60% Treasury | 40% Contributor');
+    sound.chord();
+  }
+  await wait(1400);
+
+  // Step 5: Camera overview reset
+  cameraDirector.reset();
+  state.simulating = false;
+  btnSimulate.innerText = 'SIMULATE';
+  btnSimulate.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+  btnSimulate.style.color = '#f3f4f6';
+}
+
+btnSimulate.addEventListener('click', runCinematicSimulation);
 
 // Deploy Route Button (MultiHopper Core Program Transaction Builder)
 btnDeploy.addEventListener('click', async () => {
