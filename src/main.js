@@ -6,8 +6,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // =========================================================================
-// HOPSTREAM 3D // SOLANA TOKEN-2022 MULTIHOPPER ARCHITECTURE ENGINE
-// 60 FPS Viewport Standard & Real-Time Topology Visualizer
+// HOPSTREAM 3D // ULTRA-REALISTIC PHYSICALLY-BASED WEBGL ROUTER
+// 60 FPS Viewport Standard · PBR Refraction · Interactive Raycasting
 // =========================================================================
 
 // Global State
@@ -21,7 +21,8 @@ const state = {
   replaying: false,
   network: 'devnet',
   soundEnabled: true,
-  isMobile: window.innerWidth <= 1024
+  isMobile: window.innerWidth <= 1024,
+  hoveredNode: null
 };
 
 // Protocol Program Constants
@@ -100,23 +101,10 @@ const sound = new SoundEngine();
 // =========================================================================
 const canvas = document.getElementById('webgl-canvas');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x06080d);
-scene.fog = new THREE.FogExp2(0x06080d, 0.018);
+scene.background = new THREE.Color(0x05070c);
+scene.fog = new THREE.FogExp2(0x05070c, 0.016);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-
-// Calibrate initial camera based on viewport aspect
-function adjustCameraForViewport() {
-  state.isMobile = window.innerWidth <= 1024;
-  if (state.isMobile) {
-    // Distance 48 ensures all nodes from -18 to +18 are in view in portrait mode
-    camera.position.set(0, 16, 48);
-    if (controls) controls.target.set(0, 1, 0);
-  } else {
-    camera.position.set(2, 14, 28);
-    if (controls) controls.target.set(1, 1, 0);
-  }
-}
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 1000);
 
 const renderer = new THREE.WebGLRenderer({
   canvas,
@@ -127,19 +115,67 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2.0));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.15;
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.06;
-controls.maxPolarAngle = Math.PI / 2 + 0.05;
+controls.maxPolarAngle = Math.PI / 2 + 0.04;
 controls.minDistance = 8;
-controls.maxDistance = 65;
+controls.maxDistance = 70;
 controls.touches = {
   ONE: THREE.TOUCH.ROTATE,
   TWO: THREE.TOUCH.DOLLY_PAN
 };
 
+// =========================================================================
+// 2. Procedural Studio PMREM Environment Map (Refraction & Reflections)
+// =========================================================================
+function createStudioEnvironment(r) {
+  const pmremGenerator = new THREE.PMREMGenerator(r);
+  pmremGenerator.compileEquirectangularShader();
+
+  const envScene = new THREE.Scene();
+  envScene.background = new THREE.Color(0x020306);
+
+  const panelGeo = new THREE.PlaneGeometry(35, 35);
+  
+  // Overhead Softbox (Cyan)
+  const topPanel = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: 0x00f2fe, side: THREE.DoubleSide }));
+  topPanel.position.set(0, 35, 0);
+  topPanel.rotation.x = Math.PI / 2;
+  envScene.add(topPanel);
+
+  // Rim Panel (Purple)
+  const rimPanel = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: 0x9945ff, side: THREE.DoubleSide }));
+  rimPanel.position.set(-30, 15, -25);
+  rimPanel.lookAt(0, 0, 0);
+  envScene.add(rimPanel);
+
+  // Key Panel (Emerald)
+  const keyPanel = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: 0x14f195, side: THREE.DoubleSide }));
+  keyPanel.position.set(25, 20, 20);
+  keyPanel.lookAt(0, 0, 0);
+  envScene.add(keyPanel);
+
+  const envMap = pmremGenerator.fromScene(envScene, 0.04).texture;
+  pmremGenerator.dispose();
+  return envMap;
+}
+
+scene.environment = createStudioEnvironment(renderer);
+
+// Calibrate initial camera based on viewport aspect
+function adjustCameraForViewport() {
+  state.isMobile = window.innerWidth <= 1024;
+  if (state.isMobile) {
+    camera.position.set(0, 16, 48);
+    controls.target.set(0, 1, 0);
+  } else {
+    camera.position.set(2, 14, 28);
+    controls.target.set(1, 1, 0);
+  }
+}
 adjustCameraForViewport();
 
 // =========================================================================
@@ -149,12 +185,12 @@ const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
-// Calibrated bloom: prevents solid white blobs by raising threshold and moderating strength
+// Calibrated bloom: preserves crystal facet refraction without blowout
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.65, // bloom strength
-  0.38, // bloom radius
-  0.35  // bloom threshold
+  0.60, // bloom strength
+  0.42, // bloom radius
+  0.38  // bloom threshold
 );
 composer.addPass(bloomPass);
 
@@ -162,46 +198,45 @@ const outputPass = new OutputPass();
 composer.addPass(outputPass);
 
 // =========================================================================
-// 2. Lighting & Cosmic Environment
+// 3. Lighting & Atmospheric Environment
 // =========================================================================
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
 scene.add(ambientLight);
 
 const dirLight = new THREE.DirectionalLight(0x00f2fe, 1.8);
-dirLight.position.set(15, 35, 15);
+dirLight.position.set(20, 35, 20);
 scene.add(dirLight);
 
-const purpleLight = new THREE.PointLight(0x9945ff, 4.5, 55);
-purpleLight.position.set(-16, 10, -10);
+const purpleLight = new THREE.PointLight(0x9945ff, 4.0, 60);
+purpleLight.position.set(-18, 12, -10);
 scene.add(purpleLight);
 
-const greenLight = new THREE.PointLight(0x14f195, 5.0, 55);
-greenLight.position.set(16, 10, -10);
+const greenLight = new THREE.PointLight(0x14f195, 4.5, 60);
+greenLight.position.set(18, 12, -10);
 scene.add(greenLight);
 
-// 2.1 Cosmic Starfield Quantum Dust
+// 3.1 Deep Cosmic Quantum Starfield
 function createStarfield() {
-  const count = 1200;
+  const count = 1400;
   const geo = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3);
   const colors = new Float32Array(count * 3);
 
   for (let i = 0; i < count; i++) {
-    const r = 35 + Math.random() * 50;
+    const r = 35 + Math.random() * 55;
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos((Math.random() * 2) - 1);
     positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
     positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
     positions[i * 3 + 2] = r * Math.cos(phi);
 
-    // Subtle tinting: cyan, purple, white
     const choice = Math.random();
     if (choice < 0.4) {
       colors[i * 3] = 0.0; colors[i * 3 + 1] = 0.95; colors[i * 3 + 2] = 1.0;
     } else if (choice < 0.7) {
       colors[i * 3] = 0.6; colors[i * 3 + 1] = 0.27; colors[i * 3 + 2] = 1.0;
     } else {
-      colors[i * 3] = 0.8; colors[i * 3 + 1] = 0.9; colors[i * 3 + 2] = 1.0;
+      colors[i * 3] = 0.85; colors[i * 3 + 1] = 0.9; colors[i * 3 + 2] = 1.0;
     }
   }
 
@@ -209,10 +244,10 @@ function createStarfield() {
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
   const mat = new THREE.PointsMaterial({
-    size: 0.22,
+    size: 0.24,
     vertexColors: true,
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.65,
     blending: THREE.AdditiveBlending
   });
 
@@ -221,18 +256,17 @@ function createStarfield() {
 const starfield = createStarfield();
 scene.add(starfield);
 
-// 2.2 Cybernetic Ground Grid & Concentric Radar Rings
-const gridHelper = new THREE.GridHelper(80, 60, 0x00f2fe, 0x141d2e);
+// 3.2 Cybernetic Ground Grid & Concentric Radar Rings
+const gridHelper = new THREE.GridHelper(80, 60, 0x00f2fe, 0x111827);
 gridHelper.position.y = -4;
 scene.add(gridHelper);
 
-// Concentric radar ring group
 const radarGroup = new THREE.Group();
-radarGroup.position.set(-8, -3.95, 2); // Centered under Vault Core
+radarGroup.position.set(-8, -3.95, 2);
 radarGroup.rotation.x = -Math.PI / 2;
 
-[6, 12, 18, 24].forEach((radius, i) => {
-  const ringGeo = new THREE.RingGeometry(radius - 0.05, radius + 0.05, 64);
+[6, 12, 18, 24, 30].forEach((radius, i) => {
+  const ringGeo = new THREE.RingGeometry(radius - 0.04, radius + 0.04, 64);
   const ringMat = new THREE.MeshBasicMaterial({
     color: i % 2 === 0 ? 0x00f2fe : 0x14f195,
     transparent: true,
@@ -244,8 +278,19 @@ radarGroup.rotation.x = -Math.PI / 2;
 });
 scene.add(radarGroup);
 
+// 3.3 Interactive Target Reticle (snaps to hovered 3D nodes)
+const reticleGeo = new THREE.RingGeometry(1.6, 1.7, 32);
+const reticleMat = new THREE.MeshBasicMaterial({
+  color: 0x00f2fe,
+  transparent: true,
+  opacity: 0,
+  side: THREE.DoubleSide
+});
+const reticleMesh = new THREE.Mesh(reticleGeo, reticleMat);
+scene.add(reticleMesh);
+
 // =========================================================================
-// 3. Holographic Sprite Billboards & Topology Graph
+// 4. Physical Crystal Nodes & Route Topology Graph
 // =========================================================================
 const nodeGroup = new THREE.Group();
 const curveGroup = new THREE.Group();
@@ -259,7 +304,7 @@ scene.add(labelGroup);
 let nodes = [];
 let curves = [];
 let particleSystems = [];
-let pulsePackets = [];
+let cometStreams = [];
 
 // Crisp High-DPI Canvas Text Sprite Generator
 function createHoloTextSprite(text, subtext, colorHex) {
@@ -269,7 +314,7 @@ function createHoloTextSprite(text, subtext, colorHex) {
   const ctx = c.getContext('2d');
 
   // Background pill with subtle gradient
-  ctx.fillStyle = 'rgba(8, 12, 20, 0.82)';
+  ctx.fillStyle = 'rgba(8, 12, 20, 0.85)';
   ctx.strokeStyle = colorHex;
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -301,37 +346,68 @@ function createHoloTextSprite(text, subtext, colorHex) {
   return sprite;
 }
 
-function createGlowingMesh(geometry, color, glowIntensity = 1.0) {
+// Ultra-Realistic Physically-Based Optical Glass Crystal Node
+function createCrystalNode(geometry, colorHex, radius = 1.0) {
   const group = new THREE.Group();
   
-  // Rich facet shading with controlled emissive
-  const coreMat = new THREE.MeshStandardMaterial({
-    color,
-    emissive: color,
-    emissiveIntensity: 0.24 * glowIntensity,
-    roughness: 0.42,
-    metalness: 0.75
+  // 1. Refractive Optical Glass Core (Physical transmission & internal caustic dispersion)
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color: colorHex,
+    emissive: colorHex,
+    emissiveIntensity: 0.22,
+    roughness: 0.14,
+    metalness: 0.15,
+    transmission: 0.68,
+    thickness: 1.6,
+    ior: 1.52,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.08,
+    reflectivity: 0.85
   });
-  const core = new THREE.Mesh(geometry, coreMat);
+  const core = new THREE.Mesh(geometry, glassMat);
   group.add(core);
 
-  // Outer wireframe cage tinted to matching color (prevents blown-out white)
+  // 2. High-Tech Internal Energy Core (Small additive pulsing inner sphere)
+  const innerCoreGeo = new THREE.SphereGeometry(radius * 0.42, 16, 16);
+  const innerCoreMat = new THREE.MeshBasicMaterial({
+    color: colorHex,
+    transparent: true,
+    opacity: 0.75
+  });
+  const innerCore = new THREE.Mesh(innerCoreGeo, innerCoreMat);
+  group.add(innerCore);
+
+  // 3. Precision Wireframe Exoskeleton
   const wireMat = new THREE.MeshBasicMaterial({
-    color,
+    color: colorHex,
     wireframe: true,
     transparent: true,
-    opacity: 0.22
+    opacity: 0.26
   });
   const wire = new THREE.Mesh(geometry, wireMat);
   wire.scale.setScalar(1.24);
   group.add(wire);
 
-  return { group, core, wire };
+  // 4. Outer Gyroscopic Orbit Ring
+  const ringGeo = new THREE.TorusGeometry(radius * 1.45, 0.02, 16, 64);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: colorHex,
+    transparent: true,
+    opacity: 0.32
+  });
+  const gyroRing = new THREE.Mesh(ringGeo, ringMat);
+  gyroRing.rotation.x = Math.PI / 3;
+  group.add(gyroRing);
+
+  return { group, core, innerCore, wire, gyroRing, baseColor: colorHex };
 }
 
 function rebuildTopology(hops) {
-  // Clear previous topology objects
-  while (nodeGroup.children.length > 0) nodeGroup.remove(nodeGroup.children[0]);
+  // Safe disposal of previous geometry & material to prevent GPU memory leaks
+  while (nodeGroup.children.length > 0) {
+    const c = nodeGroup.children[0];
+    nodeGroup.remove(c);
+  }
   while (curveGroup.children.length > 0) curveGroup.remove(curveGroup.children[0]);
   while (particleGroup.children.length > 0) particleGroup.remove(particleGroup.children[0]);
   while (labelGroup.children.length > 0) labelGroup.remove(labelGroup.children[0]);
@@ -339,28 +415,28 @@ function rebuildTopology(hops) {
   nodes = [];
   curves = [];
   particleSystems = [];
-  pulsePackets = [];
+  cometStreams = [];
 
   // Origin: User Wallet Node (Left)
   const originPos = new THREE.Vector3(-18, 0, 0);
-  const originNode = createGlowingMesh(new THREE.IcosahedronGeometry(1.3, 1), 0x9945ff, 1.1);
+  const originNode = createCrystalNode(new THREE.IcosahedronGeometry(1.3, 1), 0x9945ff, 1.3);
   originNode.group.position.copy(originPos);
   nodeGroup.add(originNode.group);
   nodes.push({ id: 'origin', pos: originPos, label: 'ORIGIN', mesh: originNode });
 
   const originSprite = createHoloTextSprite('ORIGIN', 'Phantom Wallet', '#9945ff');
-  originSprite.position.set(originPos.x, originPos.y + 2.4, originPos.z);
+  originSprite.position.set(originPos.x, originPos.y + 2.5, originPos.z);
   labelGroup.add(originSprite);
 
   // Vault Minter Node (Center-Left)
   const vaultPos = new THREE.Vector3(-8, 3, 2);
-  const vaultNode = createGlowingMesh(new THREE.DodecahedronGeometry(1.8, 1), 0x00f2fe, 1.3);
+  const vaultNode = createCrystalNode(new THREE.DodecahedronGeometry(1.8, 1), 0x00f2fe, 1.8);
   vaultNode.group.position.copy(vaultPos);
   nodeGroup.add(vaultNode.group);
   nodes.push({ id: 'vault', pos: vaultPos, label: 'VAULT', mesh: vaultNode });
 
   const vaultSprite = createHoloTextSprite('CORE PDA', 'Token-2022 Escrow', '#00f2fe');
-  vaultSprite.position.set(vaultPos.x, vaultPos.y + 2.8, vaultPos.z);
+  vaultSprite.position.set(vaultPos.x, vaultPos.y + 3.0, vaultPos.z);
   labelGroup.add(vaultSprite);
 
   // Connect Origin -> Vault
@@ -376,13 +452,13 @@ function rebuildTopology(hops) {
     const z = Math.cos(angle) * 3.8 - 2;
     const hopPos = new THREE.Vector3(x, y, z);
     
-    const hopNode = createGlowingMesh(new THREE.OctahedronGeometry(1.0, 0), 0x14f195, 1.1);
+    const hopNode = createCrystalNode(new THREE.OctahedronGeometry(1.0, 0), 0x14f195, 1.0);
     hopNode.group.position.copy(hopPos);
     nodeGroup.add(hopNode.group);
     nodes.push({ id: `hop-${i}`, pos: hopPos, label: `HOP ${i}`, mesh: hopNode });
 
     const hopSprite = createHoloTextSprite(`RELAY ${i}`, 'Keeper Timelock', '#14f195');
-    hopSprite.position.set(hopPos.x, hopPos.y + 2.0, hopPos.z);
+    hopSprite.position.set(hopPos.x, hopPos.y + 2.2, hopPos.z);
     labelGroup.add(hopSprite);
 
     createRouteCurve(lastPos, hopPos, 0x14f195);
@@ -391,24 +467,24 @@ function rebuildTopology(hops) {
 
   // Final Redemptions: Split Destinations (Right)
   const dest1Pos = new THREE.Vector3(18, 2, -3);
-  const dest1Node = createGlowingMesh(new THREE.IcosahedronGeometry(1.2, 1), 0x00f2fe, 1.2);
+  const dest1Node = createCrystalNode(new THREE.IcosahedronGeometry(1.2, 1), 0x00f2fe, 1.2);
   dest1Node.group.position.copy(dest1Pos);
   nodeGroup.add(dest1Node.group);
   nodes.push({ id: 'dest-a', pos: dest1Pos, label: 'TREASURY', mesh: dest1Node });
 
   const dest1Sprite = createHoloTextSprite('TREASURY', '60% Settled', '#00f2fe');
-  dest1Sprite.position.set(dest1Pos.x, dest1Pos.y + 2.2, dest1Pos.z);
+  dest1Sprite.position.set(dest1Pos.x, dest1Pos.y + 2.4, dest1Pos.z);
   labelGroup.add(dest1Sprite);
   createRouteCurve(lastPos, dest1Pos, 0x00f2fe);
 
   const dest2Pos = new THREE.Vector3(18, -2, 4);
-  const dest2Node = createGlowingMesh(new THREE.IcosahedronGeometry(1.1, 1), 0x14f195, 1.1);
+  const dest2Node = createCrystalNode(new THREE.IcosahedronGeometry(1.1, 1), 0x14f195, 1.1);
   dest2Node.group.position.copy(dest2Pos);
   nodeGroup.add(dest2Node.group);
   nodes.push({ id: 'dest-b', pos: dest2Pos, label: 'CONTRIBUTOR', mesh: dest2Node });
 
   const dest2Sprite = createHoloTextSprite('CONTRIBUTOR', '40% Settled', '#14f195');
-  dest2Sprite.position.set(dest2Pos.x, dest2Pos.y + 2.1, dest2Pos.z);
+  dest2Sprite.position.set(dest2Pos.x, dest2Pos.y + 2.2, dest2Pos.z);
   labelGroup.add(dest2Sprite);
   createRouteCurve(lastPos, dest2Pos, 0x14f195);
 
@@ -428,17 +504,28 @@ function createRouteCurve(start, end, colorHex) {
   const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
   curves.push(curve);
 
-  // Render Tube path with subtle luminosity
-  const tubeGeo = new THREE.TubeGeometry(curve, 40, 0.07, 8, false);
-  const tubeMat = new THREE.MeshBasicMaterial({
+  // 1. Inner Luminous Core Path
+  const coreTubeGeo = new THREE.TubeGeometry(curve, 48, 0.05, 8, false);
+  const coreTubeMat = new THREE.MeshBasicMaterial({
     color: colorHex,
     transparent: true,
-    opacity: 0.4
+    opacity: 0.75
   });
-  const tube = new THREE.Mesh(tubeGeo, tubeMat);
-  curveGroup.add(tube);
+  const coreTube = new THREE.Mesh(coreTubeGeo, coreTubeMat);
+  curveGroup.add(coreTube);
 
-  // Flowing Particles
+  // 2. Outer Translucent Plasma Sheath
+  const outerTubeGeo = new THREE.TubeGeometry(curve, 36, 0.12, 8, false);
+  const outerTubeMat = new THREE.MeshBasicMaterial({
+    color: colorHex,
+    transparent: true,
+    opacity: 0.16,
+    blending: THREE.AdditiveBlending
+  });
+  const outerTube = new THREE.Mesh(outerTubeGeo, outerTubeMat);
+  curveGroup.add(outerTube);
+
+  // 3. Flowing Ambient Particles
   const count = 30;
   const pGeo = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3);
@@ -456,7 +543,7 @@ function createRouteCurve(start, end, colorHex) {
   
   const pMat = new THREE.PointsMaterial({
     color: colorHex,
-    size: 0.32,
+    size: 0.30,
     transparent: true,
     opacity: 0.9,
     blending: THREE.AdditiveBlending
@@ -465,19 +552,45 @@ function createRouteCurve(start, end, colorHex) {
   const pSystem = new THREE.Points(pGeo, pMat);
   particleGroup.add(pSystem);
   particleSystems.push({ system: pSystem, curve, offsets, count });
+
+  // 4. High-Energy Comet Head (Fast moving packet pulse)
+  const cometGeo = new THREE.SphereGeometry(0.24, 16, 16);
+  const cometMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.95
+  });
+  const comet = new THREE.Mesh(cometGeo, cometMat);
+  particleGroup.add(comet);
+  cometStreams.push({ mesh: comet, curve, progress: Math.random() });
 }
 
 // =========================================================================
-// 4. Mouse-Parallax Drift System
+// 5. Interactive Raycasting & Mouse Tracking
 // =========================================================================
-const mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
+const raycaster = new THREE.Raycaster();
+const mouse = { x: 0, y: 0, targetX: 0, targetY: 0, ndcX: 0, ndcY: 0 };
+
 window.addEventListener('mousemove', (e) => {
   mouse.targetX = (e.clientX / window.innerWidth - 0.5) * 2;
   mouse.targetY = -(e.clientY / window.innerHeight - 0.5) * 2;
+  mouse.ndcX = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.ndcY = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// Interactive Click to Focus Camera on Node
+window.addEventListener('click', (e) => {
+  // If clicking UI controls, ignore
+  if (e.target.closest('aside, header, .decompile-terminal, .ai-dispatcher')) return;
+  if (state.hoveredNode) {
+    sound.click(1400);
+    // Smoothly glide controls target to the node
+    controls.target.copy(state.hoveredNode.pos);
+  }
 });
 
 // =========================================================================
-// 5. Animation Loop (Strict 16.6ms 60 FPS standard with Unreal Bloom)
+// 6. Animation Loop (Strict 16.6ms 60 FPS standard with PBR & Unreal Bloom)
 // =========================================================================
 const clock = new THREE.Clock();
 let frameCount = 0;
@@ -512,17 +625,19 @@ function animate() {
   if (!state.isMobile && !state.replaying) {
     mouse.x += (mouse.targetX - mouse.x) * 0.04;
     mouse.y += (mouse.targetY - mouse.y) * 0.04;
-    camera.position.x += (mouse.x * 0.5 - (camera.position.x - controls.target.x) * 0.01) * delta;
-    camera.position.y += (mouse.y * 0.3 - (camera.position.y - controls.target.y) * 0.01) * delta;
+    camera.position.x += (mouse.x * 0.45 - (camera.position.x - controls.target.x) * 0.01) * delta;
+    camera.position.y += (mouse.y * 0.28 - (camera.position.y - controls.target.y) * 0.01) * delta;
   }
 
-  // Rotate Nodes
+  // Rotate Nodes & Gyro Rings
   nodes.forEach((n, idx) => {
     if (n.mesh) {
-      n.mesh.core.rotation.y += 0.8 * delta;
-      n.mesh.wire.rotation.x -= 0.45 * delta;
-      n.mesh.wire.rotation.z += 0.35 * delta;
-      n.mesh.group.position.y += Math.sin(time * 2 + idx) * 0.003;
+      n.mesh.core.rotation.y += 0.75 * delta;
+      n.mesh.wire.rotation.x -= 0.4 * delta;
+      n.mesh.wire.rotation.z += 0.3 * delta;
+      n.mesh.gyroRing.rotation.z += 0.9 * delta;
+      n.mesh.innerCore.scale.setScalar(1.0 + Math.sin(time * 3 + idx) * 0.15);
+      n.mesh.group.position.y += Math.sin(time * 2 + idx) * 0.0025;
     }
   });
 
@@ -540,6 +655,45 @@ function animate() {
     ps.system.geometry.attributes.position.needsUpdate = true;
   });
 
+  // Animate High-Energy Comets
+  const cometSpeed = state.simulating || state.replaying ? 1.8 : 0.75;
+  cometStreams.forEach(cs => {
+    cs.progress = (cs.progress + cometSpeed * delta) % 1.0;
+    const pt = cs.curve.getPoint(cs.progress);
+    cs.mesh.position.copy(pt);
+  });
+
+  // Interactive Raycasting Check
+  raycaster.setFromCamera(new THREE.Vector2(mouse.ndcX, mouse.ndcY), camera);
+  const coreMeshes = nodes.map(n => n.mesh.core);
+  const intersects = raycaster.intersectObjects(coreMeshes);
+
+  if (intersects.length > 0) {
+    const hitMesh = intersects[0].object;
+    const hitNode = nodes.find(n => n.mesh.core === hitMesh);
+
+    if (hitNode && state.hoveredNode !== hitNode) {
+      state.hoveredNode = hitNode;
+      canvas.style.cursor = 'pointer';
+      sound.click(1600, 'sine', 0.02);
+
+      // Snap Reticle to Node
+      reticleMesh.position.copy(hitNode.pos);
+      reticleMesh.lookAt(camera.position);
+      reticleMat.opacity = 0.85;
+      reticleMesh.scale.setScalar(1.2);
+    }
+  } else if (state.hoveredNode) {
+    state.hoveredNode = null;
+    canvas.style.cursor = 'default';
+    reticleMat.opacity = 0;
+  }
+
+  if (reticleMat.opacity > 0) {
+    reticleMesh.rotation.z += 1.5 * delta;
+    reticleMesh.lookAt(camera.position);
+  }
+
   controls.update();
   composer.render();
 }
@@ -555,7 +709,7 @@ window.addEventListener('resize', () => {
 });
 
 // =========================================================================
-// 6. User Interface, Tabs, Audio & Solana Wallet Integration
+// 7. User Interface, Tabs, Audio & Solana Wallet Integration
 // =========================================================================
 const btnWallet = document.getElementById('btn-wallet');
 const sliderHops = document.getElementById('slider-hops');
@@ -765,7 +919,7 @@ btnDeploy.addEventListener('click', async () => {
       window.solanaWeb3.SystemProgram.transfer({
         fromPubkey: userPubkey,
         toPubkey: userPubkey,
-        lamports: 1000 // Micro rent proof
+        lamports: 1000
       })
     );
 
@@ -794,7 +948,6 @@ btnAiDispatch.addEventListener('click', () => {
 
   sound.click(1300);
 
-  // Extract hops
   const hopsMatch = query.match(/(\d+)\s*hops?/);
   if (hopsMatch) {
     const h = Math.min(Math.max(parseInt(hopsMatch[1], 10), 1), 5);
@@ -802,7 +955,6 @@ btnAiDispatch.addEventListener('click', () => {
     sliderHops.dispatchEvent(new Event('input'));
   }
 
-  // Extract amount
   const amountMatch = query.match(/(\d+)\s*(usdc|sol|bonk)?/);
   if (amountMatch) {
     const amtField = document.getElementById('input-amount');
@@ -814,7 +966,7 @@ btnAiDispatch.addEventListener('click', () => {
 });
 
 // =========================================================================
-// 7. Attach Syndicate 60 FPS Canvas Showreel Recorder
+// 8. Attach Syndicate 60 FPS Canvas Showreel Recorder
 // =========================================================================
 if (window.SyndicateRecorder) {
   window.SyndicateRecorder.attach(canvas, {
