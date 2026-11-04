@@ -36,11 +36,15 @@ const MULTIHOPPER_PROGRAMS = {
 };
 
 // =========================================================================
-// SYNTHETIC HAPTIC AUDIO ENGINE (Web Audio API)
+// SYNTHETIC HAPTIC AUDIO ENGINE (Web Audio API Sub-Drone + Acoustic Shocks)
 // =========================================================================
 class SoundEngine {
   constructor() {
     this.ctx = null;
+    this.droneOsc = null;
+    this.droneSubOsc = null;
+    this.droneGain = null;
+    this.droneFilter = null;
   }
 
   init() {
@@ -51,6 +55,39 @@ class SoundEngine {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume();
     }
+  }
+
+  startDrone() {
+    if (!state.soundEnabled || this.droneOsc) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      this.droneOsc = this.ctx.createOscillator();
+      this.droneSubOsc = this.ctx.createOscillator();
+      this.droneFilter = this.ctx.createBiquadFilter();
+      this.droneGain = this.ctx.createGain();
+
+      this.droneOsc.type = 'sawtooth';
+      this.droneOsc.frequency.setValueAtTime(55, this.ctx.currentTime); // 55Hz (A1)
+
+      this.droneSubOsc.type = 'sine';
+      this.droneSubOsc.frequency.setValueAtTime(27.5, this.ctx.currentTime); // 27.5Hz sub-octave
+
+      this.droneFilter.type = 'lowpass';
+      this.droneFilter.frequency.setValueAtTime(110, this.ctx.currentTime);
+      this.droneFilter.Q.setValueAtTime(3.5, this.ctx.currentTime);
+
+      this.droneGain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+      this.droneGain.gain.exponentialRampToValueAtTime(0.018, this.ctx.currentTime + 2.0);
+
+      this.droneOsc.connect(this.droneFilter);
+      this.droneSubOsc.connect(this.droneFilter);
+      this.droneFilter.connect(this.droneGain);
+      this.droneGain.connect(this.ctx.destination);
+
+      this.droneOsc.start();
+      this.droneSubOsc.start();
+    } catch (e) {}
   }
 
   click(freq = 1200, type = 'sine', duration = 0.03) {
@@ -68,6 +105,25 @@ class SoundEngine {
       gain.connect(this.ctx.destination);
       osc.start();
       osc.stop(this.ctx.currentTime + duration);
+    } catch (e) {}
+  }
+
+  impact(freq = 55) {
+    if (!state.soundEnabled) return;
+    this.init();
+    if (!this.ctx) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(28, this.ctx.currentTime + 0.32);
+      gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.35);
     } catch (e) {}
   }
 
@@ -327,6 +383,39 @@ function createStarfield() {
 const starfield = createStarfield();
 scene.add(starfield);
 
+// 3.1.1 Volumetric Atmospheric Motes (Active Theory Marine Snow)
+function createAtmosphericMotes() {
+  const count = 350;
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  const velocities = new Float32Array(count * 3);
+
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 44;
+    positions[i * 3 + 1] = Math.random() * 14 - 3.8;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 28;
+
+    velocities[i * 3] = (Math.random() - 0.5) * 0.006;
+    velocities[i * 3 + 1] = 0.003 + Math.random() * 0.007; // subtle vertical buoyancy
+    velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.006;
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  
+  const mat = new THREE.PointsMaterial({
+    color: 0xD4F83A,
+    size: 0.16,
+    transparent: true,
+    opacity: 0.38,
+    blending: THREE.AdditiveBlending
+  });
+
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+  return { points, velocities, count };
+}
+const atmosphericMotes = createAtmosphericMotes();
+
 // 3.2 Cybernetic Ground Grid & Concentric MultiHopper Swirl Rings
 const gridHelper = new THREE.GridHelper(80, 60, 0x00f2fe, 0x111827);
 gridHelper.position.y = -4;
@@ -473,6 +562,7 @@ let curves = [];
 let particleSystems = [];
 let cometStreams = [];
 let animatedSubpieces = [];
+let plasmaConduits = [];
 
 // Ultra-Crisp 1024x288 High-DPI Canvas Text Sprite Generator (Space Grotesk + JetBrains Mono + Status LED)
 function createHoloTextSprite(text, subtext, colorHex) {
@@ -555,6 +645,10 @@ function triggerShockwave(pos, colorHex) {
   mesh.position.y -= 0.3;
   scene.add(mesh);
   shockwaves.push({ mesh, radius: 0.28, opacity: 0.95 });
+
+  // Tactile impulse camera shake & acoustic sub-impact
+  cameraDirector.shake(0.16);
+  sound.impact(55);
 }
 
 // Procedural Crystal Node (PBR Optical Glass)
@@ -620,6 +714,7 @@ function rebuildTopology(hops) {
   particleSystems = [];
   cometStreams = [];
   animatedSubpieces = [];
+  plasmaConduits = [];
 
   // 1. Origin: User Wallet Node (Left, offset clear of sidebar)
   const originPos = new THREE.Vector3(-13.5, 0, 0);
@@ -877,16 +972,55 @@ function createRouteCurve(start, end, colorHex) {
   const coreTube = new THREE.Mesh(coreTubeGeo, coreTubeMat);
   curveGroup.add(coreTube);
 
-  // Outer Translucent Plasma Sheath
-  const outerTubeGeo = new THREE.TubeGeometry(curve, 36, 0.12, 8, false);
-  const outerTubeMat = new THREE.MeshBasicMaterial({
-    color: colorHex,
+  // Outer Dynamic GLSL Plasma Sheath (Active Theory Fresnel Plasma)
+  const outerTubeGeo = new THREE.TubeGeometry(curve, 48, 0.12, 12, false);
+  const plasmaMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(colorHex) },
+      uSpeed: { value: 2.8 }
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vViewPos;
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+        vViewPos = -mvPos.xyz;
+        gl_Position = projectionMatrix * mvPos;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform vec3 uColor;
+      uniform float uSpeed;
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vViewPos;
+
+      void main() {
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(vViewPos);
+        float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 2.2);
+
+        float pulse = sin((vUv.x * 28.0) - (uTime * uSpeed)) * 0.5 + 0.5;
+        pulse = pow(pulse, 4.5);
+
+        vec3 glowColor = mix(uColor, vec3(1.0, 1.0, 1.0), pulse * 0.7);
+        float alpha = clamp(fresnel * 0.40 + pulse * 0.50, 0.0, 0.88);
+
+        gl_FragColor = vec4(glowColor, alpha);
+      }
+    `,
     transparent: true,
-    opacity: 0.16,
-    blending: THREE.AdditiveBlending
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
   });
-  const outerTube = new THREE.Mesh(outerTubeGeo, outerTubeMat);
+  const outerTube = new THREE.Mesh(outerTubeGeo, plasmaMat);
   curveGroup.add(outerTube);
+  plasmaConduits.push(plasmaMat);
 
   // Flowing Particles
   const count = 30;
@@ -951,6 +1085,11 @@ const cameraDirector = {
   homeCamPos: new THREE.Vector3(0, 8, 30),
   homeLookAt: new THREE.Vector3(0, 0, 0),
   dampFactor: 3.2,
+  shakeIntensity: 0,
+
+  shake(amount = 0.16) {
+    this.shakeIntensity = amount;
+  },
 
   focusOn(node) {
     this.active = true;
@@ -970,17 +1109,28 @@ const cameraDirector = {
   },
 
   update(delta) {
-    if (!this.active) return;
-    camera.position.lerp(this.targetCamPos, Math.min(delta * this.dampFactor, 1.0));
-    controls.target.lerp(this.targetLookAt, Math.min(delta * this.dampFactor, 1.0));
-    if (camera.position.distanceTo(this.targetCamPos) < 0.15 && controls.target.distanceTo(this.targetLookAt) < 0.15) {
-      this.active = false;
+    if (this.active) {
+      camera.position.lerp(this.targetCamPos, Math.min(delta * this.dampFactor, 1.0));
+      controls.target.lerp(this.targetLookAt, Math.min(delta * this.dampFactor, 1.0));
+      if (camera.position.distanceTo(this.targetCamPos) < 0.15 && controls.target.distanceTo(this.targetLookAt) < 0.15) {
+        this.active = false;
+      }
+    }
+
+    // High-Frequency Tactile Camera Shake Decay
+    if (this.shakeIntensity > 0.001) {
+      const shakeX = (Math.random() - 0.5) * this.shakeIntensity;
+      const shakeY = (Math.random() - 0.5) * this.shakeIntensity;
+      camera.position.x += shakeX;
+      camera.position.y += shakeY;
+      this.shakeIntensity *= Math.pow(0.06, delta);
     }
   }
 };
 
-// Interactive Click to Focus Camera on Node
+// Interactive Click to Focus Camera on Node & Start Acoustic Drone
 window.addEventListener('click', (e) => {
+  sound.startDrone();
   if (e.target.closest('aside, header, .decompile-terminal, .ai-dispatcher')) return;
   if (state.hoveredNode) {
     sound.click(1400);
@@ -1019,6 +1169,24 @@ function animate() {
   floorMat.uniforms.uTime.value = time;
   LuxuryCinematicShader.uniforms.uTime.value = time;
   cameraDirector.update(delta);
+
+  // Update Dynamic Plasma Energy Conduits (Active Theory Fresnel Plasma)
+  plasmaConduits.forEach(m => {
+    m.uniforms.uTime.value = time;
+    m.uniforms.uSpeed.value = state.simulating ? 7.5 : 2.8;
+  });
+
+  // Drift Atmospheric Motes (Active Theory Marine Snow)
+  const motesPos = atmosphericMotes.points.geometry.attributes.position.array;
+  for (let i = 0; i < atmosphericMotes.count; i++) {
+    motesPos[i * 3] += atmosphericMotes.velocities[i * 3];
+    motesPos[i * 3 + 1] += atmosphericMotes.velocities[i * 3 + 1];
+    motesPos[i * 3 + 2] += atmosphericMotes.velocities[i * 3 + 2];
+
+    if (motesPos[i * 3 + 1] > 10.0) motesPos[i * 3 + 1] = -3.8;
+    if (Math.abs(motesPos[i * 3]) > 25.0) motesPos[i * 3] *= -0.9;
+  }
+  atmosphericMotes.points.geometry.attributes.position.needsUpdate = true;
 
   // Slow Starfield Cosmic Drift
   starfield.rotation.y = time * 0.015;
@@ -1343,6 +1511,7 @@ async function runCinematicSimulation() {
   btnSimulate.innerText = 'EXECUTING...';
   btnSimulate.style.borderColor = '#D4F83A';
   btnSimulate.style.color = '#D4F83A';
+  sound.startDrone();
 
   if (decompileTerminal) decompileTerminal.style.display = 'flex';
   if (decompileBody) decompileBody.innerHTML = '';
