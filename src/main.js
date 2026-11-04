@@ -146,14 +146,14 @@ function createStudioEnvironment(r) {
   topPanel.rotation.x = Math.PI / 2;
   envScene.add(topPanel);
 
-  // Rim Panel (Purple)
+  // Rim Panel (Solana Purple)
   const rimPanel = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: 0x9945ff, side: THREE.DoubleSide }));
   rimPanel.position.set(-30, 15, -25);
   rimPanel.lookAt(0, 0, 0);
   envScene.add(rimPanel);
 
-  // Key Panel (Emerald)
-  const keyPanel = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: 0x14f195, side: THREE.DoubleSide }));
+  // Key Panel (MultiHopper Electric Acid Lime)
+  const keyPanel = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: 0xD4F83A, side: THREE.DoubleSide }));
   keyPanel.position.set(25, 20, 20);
   keyPanel.lookAt(0, 0, 0);
   envScene.add(keyPanel);
@@ -268,9 +268,9 @@ radarGroup.rotation.x = -Math.PI / 2;
 [6, 12, 18, 24, 30].forEach((radius, i) => {
   const ringGeo = new THREE.RingGeometry(radius - 0.04, radius + 0.04, 64);
   const ringMat = new THREE.MeshBasicMaterial({
-    color: i % 2 === 0 ? 0x00f2fe : 0x14f195,
+    color: i % 2 === 0 ? 0xD4F83A : 0x00f2fe,
     transparent: true,
-    opacity: 0.22 - (i * 0.03),
+    opacity: 0.24 - (i * 0.03),
     side: THREE.DoubleSide
   });
   const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -281,7 +281,7 @@ scene.add(radarGroup);
 // 3.3 Interactive Target Reticle (snaps to hovered 3D nodes)
 const reticleGeo = new THREE.RingGeometry(1.6, 1.7, 32);
 const reticleMat = new THREE.MeshBasicMaterial({
-  color: 0x00f2fe,
+  color: 0xD4F83A,
   transparent: true,
   opacity: 0,
   side: THREE.DoubleSide
@@ -322,15 +322,16 @@ function createHoloTextSprite(text, subtext, colorHex) {
   ctx.fill();
   ctx.stroke();
 
-  // Primary label
+  // Primary label with Space Grotesk
   ctx.fillStyle = colorHex;
-  ctx.font = 'bold 44px "JetBrains Mono", monospace';
+  ctx.font = 'bold 44px "Space Grotesk", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(text, 256, 62);
 
-  // Subtext
+  // Subtext with JetBrains Mono
   ctx.fillStyle = '#cbd5e1';
-  ctx.font = '600 26px "Plus Jakarta Sans", sans-serif';
+  ctx.font = '600 24px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
   ctx.fillText(subtext, 256, 106);
 
   const tex = new THREE.CanvasTexture(c);
@@ -452,16 +453,16 @@ function rebuildTopology(hops) {
     const z = Math.cos(angle) * 3.8 - 2;
     const hopPos = new THREE.Vector3(x, y, z);
     
-    const hopNode = createCrystalNode(new THREE.OctahedronGeometry(1.0, 0), 0x14f195, 1.0);
+    const hopNode = createCrystalNode(new THREE.OctahedronGeometry(1.0, 0), 0xD4F83A, 1.0);
     hopNode.group.position.copy(hopPos);
     nodeGroup.add(hopNode.group);
     nodes.push({ id: `hop-${i}`, pos: hopPos, label: `HOP ${i}`, mesh: hopNode });
 
-    const hopSprite = createHoloTextSprite(`RELAY ${i}`, 'Keeper Timelock', '#14f195');
+    const hopSprite = createHoloTextSprite(`RELAY ${i}`, 'Keeper Timelock', '#D4F83A');
     hopSprite.position.set(hopPos.x, hopPos.y + 2.2, hopPos.z);
     labelGroup.add(hopSprite);
 
-    createRouteCurve(lastPos, hopPos, 0x14f195);
+    createRouteCurve(lastPos, hopPos, 0xD4F83A);
     lastPos = hopPos;
   }
 
@@ -478,15 +479,15 @@ function rebuildTopology(hops) {
   createRouteCurve(lastPos, dest1Pos, 0x00f2fe);
 
   const dest2Pos = new THREE.Vector3(18, -2, 4);
-  const dest2Node = createCrystalNode(new THREE.IcosahedronGeometry(1.1, 1), 0x14f195, 1.1);
+  const dest2Node = createCrystalNode(new THREE.IcosahedronGeometry(1.1, 1), 0xD4F83A, 1.1);
   dest2Node.group.position.copy(dest2Pos);
   nodeGroup.add(dest2Node.group);
   nodes.push({ id: 'dest-b', pos: dest2Pos, label: 'CONTRIBUTOR', mesh: dest2Node });
 
-  const dest2Sprite = createHoloTextSprite('CONTRIBUTOR', '40% Settled', '#14f195');
+  const dest2Sprite = createHoloTextSprite('CONTRIBUTOR', '40% Settled', '#D4F83A');
   dest2Sprite.position.set(dest2Pos.x, dest2Pos.y + 2.2, dest2Pos.z);
   labelGroup.add(dest2Sprite);
-  createRouteCurve(lastPos, dest2Pos, 0x14f195);
+  createRouteCurve(lastPos, dest2Pos, 0xD4F83A);
 
   // Update UI Elements
   const statFee = document.getElementById('stat-fee');

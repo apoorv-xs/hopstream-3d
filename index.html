@@ -7,20 +7,23 @@
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet">
   
   <style>
     :root {
-      --bg: #06080d;
-      --card-bg: rgba(11, 15, 25, 0.85);
+      --bg: #07090e;
+      --card-bg: rgba(12, 16, 26, 0.86);
       --card-border: rgba(255, 255, 255, 0.08);
-      --card-highlight: rgba(255, 255, 255, 0.12);
+      --card-highlight: rgba(255, 255, 255, 0.14);
+      --mh-lime: #D4F83A;
+      --mh-lime-glow: rgba(212, 248, 58, 0.4);
       --solana-purple: #9945ff;
       --solana-green: #14f195;
       --cyan: #00f2fe;
       --text-main: #f3f4f6;
       --text-muted: #94a3b8;
       --font-mono: 'JetBrains Mono', monospace;
+      --font-display: 'Space Grotesk', sans-serif;
       --font-sans: 'Plus Jakarta Sans', sans-serif;
     }
     
@@ -48,7 +51,7 @@
     }
 
     /* =========================================================================
-       TOP NAVIGATION HEADER
+       TOP NAVIGATION HEADER (Cyber-Tactical Monolith)
        ========================================================================= */
     header {
       position: absolute;
@@ -59,7 +62,7 @@
       justify-content: space-between;
       align-items: center;
       z-index: 30;
-      background: linear-gradient(180deg, rgba(6, 8, 13, 0.95) 0%, rgba(6, 8, 13, 0.4) 75%, transparent 100%);
+      background: linear-gradient(180deg, rgba(7, 9, 14, 0.95) 0%, rgba(7, 9, 14, 0.4) 75%, transparent 100%);
       pointer-events: none;
     }
 
@@ -70,18 +73,26 @@
       pointer-events: auto;
     }
     .brand-logo {
-      width: 34px; height: 34px;
-      border-radius: 9px;
-      background: linear-gradient(135deg, var(--solana-purple), var(--solana-green));
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: rgba(18, 24, 38, 0.9);
+      border: 1px solid rgba(212, 248, 58, 0.4);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 20px rgba(20, 241, 149, 0.35);
+      box-shadow: 0 0 20px var(--mh-lime-glow);
       flex-shrink: 0;
+      transition: all 0.3s ease;
     }
-    .brand-logo svg { width: 18px; height: 18px; fill: #06080d; }
+    .brand-logo:hover {
+      box-shadow: 0 0 28px var(--mh-lime);
+      border-color: var(--mh-lime);
+    }
+    .brand-logo svg { width: 24px; height: 24px; }
+    
     .brand-title {
-      font-size: 16px;
+      font-family: var(--font-display);
+      font-size: 17px;
       font-weight: 800;
       letter-spacing: -0.02em;
       display: flex;
@@ -93,10 +104,10 @@
       font-size: 9px;
       padding: 2px 7px;
       border-radius: 5px;
-      background: rgba(20, 241, 149, 0.1);
-      border: 1px solid rgba(20, 241, 149, 0.3);
-      color: var(--solana-green);
-      font-weight: 600;
+      background: rgba(212, 248, 58, 0.12);
+      border: 1px solid rgba(212, 248, 58, 0.4);
+      color: var(--mh-lime);
+      font-weight: 700;
       letter-spacing: 0.05em;
     }
 
@@ -147,16 +158,16 @@
       transition: all 0.2s;
     }
     .btn-icon:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
-    .btn-icon.active { color: var(--solana-green); border-color: rgba(20, 241, 149, 0.4); }
+    .btn-icon.active { color: var(--mh-lime); border-color: rgba(212, 248, 58, 0.45); }
 
     .network-badge {
       font-family: var(--font-mono);
       font-size: 10px;
-      padding: 6px 10px;
+      padding: 6px 11px;
       border-radius: 20px;
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid var(--card-border);
-      color: var(--solana-green);
+      color: var(--mh-lime);
       display: flex;
       align-items: center;
       gap: 6px;
@@ -164,8 +175,8 @@
     .dot-live {
       width: 5px; height: 5px;
       border-radius: 50%;
-      background: var(--solana-green);
-      box-shadow: 0 0 8px var(--solana-green);
+      background: var(--mh-lime);
+      box-shadow: 0 0 8px var(--mh-lime);
       animation: pulse 2s infinite;
     }
     @keyframes pulse {
@@ -176,19 +187,21 @@
     button.btn-connect {
       padding: 8px 18px;
       border-radius: 10px;
-      background: linear-gradient(135deg, #9945ff, #14f195);
+      background: linear-gradient(135deg, #9945ff, #D4F83A);
       border: none;
-      color: #06080d;
-      font-weight: 700;
+      color: #07090e;
+      font-family: var(--font-display);
+      font-weight: 800;
       font-size: 12px;
+      letter-spacing: 0.02em;
       cursor: pointer;
       transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 2px 14px rgba(153, 69, 255, 0.3);
+      box-shadow: 0 2px 14px rgba(212, 248, 58, 0.25);
       white-space: nowrap;
     }
     button.btn-connect:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 20px rgba(20, 241, 149, 0.45);
+      box-shadow: 0 4px 22px rgba(212, 248, 58, 0.55);
     }
 
     /* =========================================================================
@@ -204,7 +217,7 @@
       backdrop-filter: blur(28px);
       -webkit-backdrop-filter: blur(28px);
       border: 1px solid var(--card-border);
-      box-shadow: inset 0 1px 0 var(--card-highlight), 0 20px 50px rgba(0, 0, 0, 0.55);
+      box-shadow: inset 0 1px 0 var(--card-highlight), 0 20px 50px rgba(0, 0, 0, 0.6);
       border-radius: 18px;
       z-index: 25;
       padding: 20px;
@@ -219,7 +232,7 @@
     aside.sidebar::-webkit-scrollbar { width: 4px; }
     aside.sidebar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 4px; }
 
-    /* Mobile Sheet Handle (Hidden on Desktop) */
+    /* Mobile Sheet Handle */
     .sheet-handle {
       display: none;
       width: 100%;
@@ -235,20 +248,20 @@
       background: rgba(255, 255, 255, 0.25);
     }
 
-    /* Mobile Quick Bar Summary (Shown when collapsed) */
+    /* Mobile Quick Bar Summary */
     .mobile-quick-summary {
       display: none;
       justify-content: space-between;
       align-items: center;
       font-size: 11px;
       font-family: var(--font-mono);
-      color: var(--solana-green);
+      color: var(--mh-lime);
     }
 
     /* Navigation Mode Tabs */
     .nav-tabs {
       display: flex;
-      background: rgba(0, 0, 0, 0.35);
+      background: rgba(0, 0, 0, 0.4);
       border: 1px solid var(--card-border);
       border-radius: 10px;
       padding: 3px;
@@ -261,6 +274,7 @@
       border: none;
       background: transparent;
       color: var(--text-muted);
+      font-family: var(--font-display);
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.04em;
@@ -274,9 +288,10 @@
     }
 
     .sidebar-section-title {
-      font-size: 11px;
+      font-family: var(--font-display);
+      font-size: 12px;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.06em;
       color: var(--text-muted);
       font-weight: 700;
       display: flex;
@@ -300,7 +315,7 @@
       font-family: var(--font-mono);
       font-size: 13px;
       font-weight: 700;
-      color: var(--solana-green);
+      color: var(--mh-lime);
     }
     .stat-box .lbl {
       font-size: 9px;
@@ -322,6 +337,7 @@
       font-weight: 700;
       letter-spacing: 0.05em;
       text-transform: uppercase;
+      font-family: var(--font-mono);
     }
     .input-wrapper {
       position: relative;
@@ -341,8 +357,8 @@
       transition: border-color 0.2s;
     }
     input:focus, select:focus {
-      border-color: var(--solana-green);
-      box-shadow: 0 0 12px rgba(20, 241, 149, 0.2);
+      border-color: var(--mh-lime);
+      box-shadow: 0 0 12px var(--mh-lime-glow);
     }
 
     /* Hop Stepper slider */
@@ -371,12 +387,12 @@
       -webkit-appearance: none;
       width: 18px; height: 18px;
       border-radius: 50%;
-      background: var(--solana-green);
+      background: var(--mh-lime);
       cursor: pointer;
-      box-shadow: 0 0 10px var(--solana-green);
+      box-shadow: 0 0 12px var(--mh-lime);
     }
 
-    /* Visual Route Sequence Flow */
+    /* Route Sequence Flow Visualization */
     .route-sequence-flow {
       display: flex;
       align-items: center;
@@ -390,7 +406,7 @@
       color: var(--text-muted);
     }
     .flow-node { display: flex; align-items: center; gap: 4px; }
-    .flow-node.active { color: var(--cyan); font-weight: 600; }
+    .flow-node.active { color: var(--mh-lime); font-weight: 600; }
     .flow-arrow { color: rgba(255, 255, 255, 0.2); font-size: 12px; }
 
     /* Replayer Section */
@@ -427,10 +443,12 @@
       font-size: 11px;
       font-weight: 700;
       border-radius: 8px;
-      background: var(--cyan);
+      background: var(--mh-lime);
       border: none;
-      color: #06080d;
+      color: #07090e;
       cursor: pointer;
+      font-family: var(--font-display);
+      font-weight: 800;
     }
 
     /* Program Architecture Badge */
@@ -445,7 +463,7 @@
       line-height: 1.6;
     }
     .programs-tree .core { color: var(--solana-purple); font-weight: 600; }
-    .programs-tree .guard { color: var(--solana-green); font-weight: 600; }
+    .programs-tree .guard { color: var(--mh-lime); font-weight: 600; }
 
     /* Action Buttons */
     .btn-group {
@@ -458,16 +476,17 @@
       flex: 1;
       padding: 12px;
       border-radius: 10px;
-      background: linear-gradient(135deg, var(--solana-purple), var(--solana-green));
-      color: #06080d;
-      font-weight: 700;
+      background: linear-gradient(135deg, var(--solana-purple), var(--mh-lime));
+      color: #07090e;
+      font-family: var(--font-display);
+      font-weight: 800;
       font-size: 12px;
       border: none;
       cursor: pointer;
       transition: all 0.2s;
     }
     .btn-primary:hover {
-      box-shadow: 0 6px 24px rgba(20, 241, 149, 0.4);
+      box-shadow: 0 6px 24px var(--mh-lime-glow);
       transform: translateY(-1px);
     }
     .btn-secondary {
@@ -476,7 +495,8 @@
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--card-border);
       color: #fff;
-      font-weight: 600;
+      font-family: var(--font-display);
+      font-weight: 700;
       font-size: 12px;
       cursor: pointer;
     }
@@ -494,7 +514,7 @@
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
       border: 1px solid var(--card-border);
-      box-shadow: inset 0 1px 0 var(--card-highlight), 0 14px 40px rgba(0, 0, 0, 0.45);
+      box-shadow: inset 0 1px 0 var(--card-highlight), 0 14px 40px rgba(0, 0, 0, 0.5);
       border-radius: 14px;
       padding: 10px 16px;
       z-index: 20;
@@ -506,12 +526,13 @@
     .ai-icon {
       width: 28px; height: 28px;
       border-radius: 7px;
-      background: rgba(153, 69, 255, 0.18);
-      border: 1px solid rgba(153, 69, 255, 0.4);
+      background: rgba(212, 248, 58, 0.15);
+      border: 1px solid rgba(212, 248, 58, 0.45);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--solana-purple);
+      color: var(--mh-lime);
+      font-family: var(--font-display);
       font-weight: 800;
       font-size: 11px;
       flex-shrink: 0;
@@ -533,8 +554,9 @@
       background: rgba(255, 255, 255, 0.08);
       border: 1px solid var(--card-border);
       color: #fff;
+      font-family: var(--font-display);
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -543,9 +565,9 @@
       flex-shrink: 0;
     }
     .btn-dispatch:hover {
-      background: var(--solana-green);
-      color: #06080d;
-      border-color: var(--solana-green);
+      background: var(--mh-lime);
+      color: #07090e;
+      border-color: var(--mh-lime);
     }
 
     /* =========================================================================
@@ -556,11 +578,11 @@
       top: 76px;
       right: clamp(14px, 2vw, 24px);
       z-index: 20;
-      background: rgba(11, 15, 25, 0.8);
+      background: rgba(12, 16, 26, 0.82);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--card-border);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
       border-radius: 12px;
       padding: 10px 16px;
       font-family: var(--font-mono);
@@ -571,14 +593,14 @@
       transition: opacity 0.3s;
     }
     .telemetry-row { display: flex; justify-content: space-between; gap: 20px; }
-    .telemetry-row span:last-child { color: var(--solana-green); font-weight: 600; }
+    .telemetry-row span:last-child { color: var(--mh-lime); font-weight: 600; }
 
     .decompile-terminal {
       position: absolute;
       top: 170px;
       right: clamp(14px, 2vw, 24px);
       width: clamp(280px, 22vw, 340px);
-      background: rgba(6, 8, 13, 0.9);
+      background: rgba(7, 9, 14, 0.92);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--card-border);
@@ -594,7 +616,7 @@
     }
     .decompile-header {
       font-weight: 700;
-      color: var(--cyan);
+      color: var(--mh-lime);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -607,7 +629,7 @@
       max-height: 140px;
       overflow-y: auto;
     }
-    .decompile-body span.pass { color: var(--solana-green); font-weight: 600; }
+    .decompile-body span.pass { color: var(--mh-lime); font-weight: 600; }
 
     /* =========================================================================
        CINEMATIC FULL-CANVAS VIEWPORT MODE
@@ -685,7 +707,7 @@
     }
 
     @media (max-width: 480px) {
-      .brand-title { font-size: 14px; }
+      .brand-title { font-size: 15px; }
       button.btn-connect { padding: 7px 12px; font-size: 11px; }
       .card-route-stats { gap: 6px; }
       .stat-box { padding: 8px 6px; }
@@ -714,8 +736,14 @@
   <!-- Top Navigation Header -->
   <header>
     <div class="brand">
-      <div class="brand-logo">
-        <svg viewBox="0 0 24 24"><path d="M4 18L10 12L4 6M12 18H20"/></svg>
+      <!-- Official MultiHopper Concentric Orbital Swirl Logo -->
+      <div class="brand-logo" title="MultiHopper Protocol">
+        <svg viewBox="0 0 36 36" fill="none">
+          <ellipse cx="18" cy="18" rx="14" ry="7" transform="rotate(-30 18 18)" stroke="#D4F83A" stroke-width="2.2" stroke-dasharray="82 8"/>
+          <ellipse cx="18" cy="18" rx="10" ry="4.8" transform="rotate(-30 18 18)" stroke="#00F2FE" stroke-width="2.0" stroke-dasharray="55 8"/>
+          <ellipse cx="18" cy="18" rx="6" ry="2.8" transform="rotate(-30 18 18)" stroke="#9945FF" stroke-width="1.8"/>
+          <circle cx="18" cy="18" r="1.5" fill="#D4F83A"/>
+        </svg>
       </div>
       <div class="brand-title">
         HOPSTREAM 3D
@@ -740,7 +768,7 @@
 
       <div class="network-badge">
         <div class="dot-live"></div>
-        <span id="network-display">DEVNET</span>
+        <span id="network-display">SOLANA DEVNET</span>
       </div>
 
       <button class="btn-connect" id="btn-wallet">CONNECT PHANTOM</button>
@@ -755,7 +783,7 @@
     </div>
 
     <div class="mobile-quick-summary" id="mobile-summary">
-      <span id="mob-summary-hops">3 HOPS SEQUENCING</span>
+      <span id="mob-summary-hops">⚡ 3 HOPS · 0.00015 SOL</span>
       <span id="mob-toggle-txt" style="color: #fff; font-size: 10px;">TAP TO EXPAND ▲</span>
     </div>
 
@@ -767,7 +795,7 @@
 
     <div class="sidebar-section-title">
       <span id="section-heading">Route Architecture</span>
-      <span style="color: var(--solana-green); font-family: var(--font-mono);">SWIFT 2.0</span>
+      <span style="color: var(--mh-lime); font-family: var(--font-mono);">SWIFT 2.0</span>
     </div>
 
     <!-- Quick Telemetry Stats -->
@@ -811,7 +839,7 @@
       <div class="hops-control">
         <div class="slider-header">
           <span style="color: var(--text-muted); font-weight: 700;">HOPS SEQUENCING</span>
-          <span id="hops-label" style="color: var(--solana-green); font-weight: 700; font-family: var(--font-mono);">3 Hops (Staggered 30s)</span>
+          <span id="hops-label" style="color: var(--mh-lime); font-weight: 700; font-family: var(--font-mono);">3 Hops (Staggered 30s)</span>
         </div>
         <input type="range" id="slider-hops" min="1" max="5" value="3">
       </div>
@@ -850,7 +878,7 @@
         </div>
       </div>
       <div class="programs-tree">
-        <div>Trace Status: <span style="color: var(--cyan);">Hook Active</span></div>
+        <div>Trace Status: <span style="color: var(--mh-lime);">Hook Active</span></div>
         <div>Indexed Vaults: <span style="color: #fff;">18,420 Active PDA</span></div>
       </div>
     </div>
@@ -876,14 +904,14 @@
   <div class="telemetry-hud">
     <div class="telemetry-row"><span>Vault Status:</span> <span>SYNCED</span></div>
     <div class="telemetry-row"><span>Keepers:</span> <span id="telemetry-keepers">14 Online</span></div>
-    <div class="telemetry-row"><span>HDR Bloom:</span> <span style="color: var(--cyan);">CALIBRATED</span></div>
+    <div class="telemetry-row"><span>HDR Bloom:</span> <span style="color: var(--mh-lime);">CALIBRATED</span></div>
   </div>
 
   <!-- Decompiled Route Floating Telemetry Box -->
   <div class="decompile-terminal" id="decompile-terminal">
     <div class="decompile-header">
       <span>ON-CHAIN EXECUTION LOG</span>
-      <span style="font-size: 9px; color: var(--solana-green);">VERIFIED</span>
+      <span style="font-size: 9px; color: var(--mh-lime);">VERIFIED</span>
     </div>
     <div class="decompile-body" id="decompile-body">
       <div>[00:00.12] Core Escrow Locked 1,000 USDC</div>
