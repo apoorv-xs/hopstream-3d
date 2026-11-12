@@ -263,21 +263,15 @@ const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 composer.addPass(renderPass);
 
-// Cinema Lens Depth of Field (True Optical Bokeh)
-const bokehPass = new BokehPass(scene, camera, {
-  focus: 28.0,
-  aperture: 0.00018,
-  maxblur: 0.008,
-  width: window.innerWidth,
-  height: window.innerHeight
-});
-composer.addPass(bokehPass);
+// Cinema Lens Depth of Field (Bypassed for strict 16.6ms 60.0 FPS locked viewport)
+// const bokehPass = new BokehPass(scene, camera, { ... });
+// composer.addPass(bokehPass);
 
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.28, // calibrated bloom strength (subtle, crisp edge speculars)
-  0.28, // tight bloom radius (eliminates washout light bleed)
-  0.78  // high bloom threshold (only laser sparks & diodes bloom)
+  0.22, // subtle, refined bloom strength
+  0.25, // tight radius
+  0.82  // laser sparks & diodes bloom only
 );
 composer.addPass(bloomPass);
 
@@ -355,11 +349,11 @@ const dirLight = new THREE.DirectionalLight(0x00f2fe, 1.8);
 dirLight.position.set(20, 35, 20);
 scene.add(dirLight);
 
-const purpleLight = new THREE.PointLight(0x9945ff, 4.0, 60);
+const purpleLight = new THREE.PointLight(0x9945ff, 0.65, 45);
 purpleLight.position.set(-18, 12, -10);
 scene.add(purpleLight);
 
-const greenLight = new THREE.PointLight(0xD4F83A, 4.5, 60);
+const greenLight = new THREE.PointLight(0xD4F83A, 0.75, 45);
 greenLight.position.set(18, 12, -10);
 scene.add(greenLight);
 
@@ -1321,7 +1315,7 @@ const cameraDirector = {
     }
 
     // Dynamic Focal Plane Tracking for Optical Bokeh (active target tracking)
-    if (bokehPass && bokehPass.uniforms && bokehPass.uniforms['focus']) {
+    if (typeof bokehPass !== 'undefined' && bokehPass && bokehPass.uniforms && bokehPass.uniforms['focus']) {
       const targetDist = camera.position.distanceTo(controls.target);
       bokehPass.uniforms['focus'].value = THREE.MathUtils.lerp(
         bokehPass.uniforms['focus'].value,

@@ -212,25 +212,62 @@
       top: 76px;
       left: clamp(14px, 2vw, 24px);
       bottom: clamp(14px, 2vw, 24px);
-      width: clamp(330px, 26vw, 390px);
+      width: clamp(330px, 26vw, 380px);
       background: var(--card-bg);
       backdrop-filter: blur(28px);
       -webkit-backdrop-filter: blur(28px);
       border: 1px solid var(--card-border);
-      box-shadow: inset 0 1px 0 var(--card-highlight), 0 20px 50px rgba(0, 0, 0, 0.6);
+      box-shadow: inset 0 1px 0 var(--card-highlight), 0 20px 50px rgba(0, 0, 0, 0.7);
       border-radius: 18px;
       z-index: 25;
-      padding: 20px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      scrollbar-gutter: stable;
+      overflow: hidden; /* No outer overflow; body scrolls internally */
       transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
     }
-    aside.sidebar::-webkit-scrollbar { width: 4px; }
-    aside.sidebar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 4px; }
+
+    .sidebar-header {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+      margin-bottom: 10px;
+    }
+
+    .sidebar-body {
+      flex: 1;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-right: 4px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+    }
+    .sidebar-body::-webkit-scrollbar {
+      width: 4px;
+    }
+    .sidebar-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .sidebar-body::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+    }
+    .sidebar-body::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+
+    .sidebar-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
 
     /* Mobile Sheet Handle */
     .sheet-handle {
@@ -780,128 +817,135 @@
 
   <!-- Route Architect Left Sidebar / Mobile Bottom Sheet -->
   <aside class="sidebar" id="sidebar-drawer">
-    <!-- Mobile Sheet Drag Handle & Collapsed Bar -->
-    <div class="sheet-handle" id="sheet-handle">
-      <div class="sheet-bar"></div>
-    </div>
-
-    <div class="mobile-quick-summary" id="mobile-summary">
-      <span id="mob-summary-hops">⚡ 3 HOPS · 0.00015 SOL</span>
-      <span id="mob-toggle-txt" style="color: #fff; font-size: 10px;">TAP TO EXPAND ▲</span>
-    </div>
-
-    <!-- View Mode Switcher -->
-    <div class="nav-tabs">
-      <button class="tab-btn active" id="tab-architect">ROUTE ARCHITECT</button>
-      <button class="tab-btn" id="tab-replayer">ON-CHAIN DECOMPILER</button>
-    </div>
-
-    <div class="sidebar-section-title">
-      <span id="section-heading">Route Architecture</span>
-      <span style="color: var(--mh-lime); font-family: var(--font-mono);">SWIFT 2.0</span>
-    </div>
-
-    <!-- Quick Telemetry Stats -->
-    <div class="card-route-stats">
-      <div class="stat-box">
-        <div class="val" id="stat-hops">3 HOPS</div>
-        <div class="lbl">Relay Steps</div>
+    <!-- Top Pinned Header -->
+    <div class="sidebar-header">
+      <div class="sheet-handle" id="sheet-handle">
+        <div class="sheet-bar"></div>
       </div>
-      <div class="stat-box">
-        <div class="val" id="stat-fee">0.00015 SOL</div>
-        <div class="lbl">Keeper Rent</div>
+
+      <div class="mobile-quick-summary" id="mobile-summary">
+        <span id="mob-summary-hops">⚡ 3 HOPS · 0.00015 SOL</span>
+        <span id="mob-toggle-txt" style="color: #fff; font-size: 10px;">TAP TO EXPAND ▲</span>
       </div>
-      <div class="stat-box">
-        <div class="val" id="stat-fps">60.0 FPS</div>
-        <div class="lbl">Viewport</div>
+
+      <!-- View Mode Switcher -->
+      <div class="nav-tabs">
+        <button class="tab-btn active" id="tab-architect">ROUTE ARCHITECT</button>
+        <button class="tab-btn" id="tab-replayer">ON-CHAIN DECOMPILER</button>
+      </div>
+
+      <div class="sidebar-section-title">
+        <span id="section-heading">Route Architecture</span>
+        <span style="color: var(--mh-lime); font-family: var(--font-mono);">SWIFT 2.0</span>
+      </div>
+
+      <!-- Quick Telemetry Stats -->
+      <div class="card-route-stats">
+        <div class="stat-box">
+          <div class="val" id="stat-hops">3 HOPS</div>
+          <div class="lbl">Relay Steps</div>
+        </div>
+        <div class="stat-box">
+          <div class="val" id="stat-fee">0.00015 SOL</div>
+          <div class="lbl">Keeper Rent</div>
+        </div>
+        <div class="stat-box">
+          <div class="val" id="stat-fps">60.0 FPS</div>
+          <div class="lbl">Viewport</div>
+        </div>
       </div>
     </div>
 
-    <!-- Architect Panel Controls -->
-    <div id="panel-architect" style="display: flex; flex-direction: column; gap: 14px;">
-      <!-- Token & Amount Field -->
-      <div class="field-group">
-        <label>ROUTED ASSET & VAULT DEPOSIT</label>
-        <div class="input-wrapper">
-          <select id="select-asset">
-            <option value="USDC-2022">USDC (Token-2022 Transfer Hook Guard)</option>
-            <option value="SOL">Wrapped Native SOL</option>
-            <option value="BONK">BONK (Automated Multi-Split)</option>
-          </select>
+    <!-- Scrollable Body with Clean Sub-Pixel Scrollbar -->
+    <div class="sidebar-body">
+      <!-- Architect Panel Controls -->
+      <div id="panel-architect" style="display: flex; flex-direction: column; gap: 11px;">
+        <!-- Token & Amount Field -->
+        <div class="field-group">
+          <label>ROUTED ASSET & VAULT DEPOSIT</label>
+          <div class="input-wrapper">
+            <select id="select-asset">
+              <option value="USDC-2022">USDC (Token-2022 Transfer Hook Guard)</option>
+              <option value="SOL">Wrapped Native SOL</option>
+              <option value="BONK">BONK (Automated Multi-Split)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>TOTAL TRANSFER VALUE</label>
+          <div class="input-wrapper">
+            <input type="number" id="input-amount" value="1000" min="1" step="10">
+          </div>
+        </div>
+
+        <!-- Hops Count Stepper Slider -->
+        <div class="hops-control">
+          <div class="slider-header">
+            <span style="color: var(--text-muted); font-size: 9px; font-weight: 700; font-family: var(--font-mono); letter-spacing: 0.05em;">HOPS SEQUENCING</span>
+            <span id="hops-label" style="color: var(--mh-lime); font-size: 10px; font-weight: 700; font-family: var(--font-mono);">3 Hops (Staggered 30s)</span>
+          </div>
+          <input type="range" id="slider-hops" min="1" max="5" value="3">
+        </div>
+
+        <!-- Route Sequence Flow Visualization -->
+        <div class="route-sequence-flow">
+          <span class="flow-node active">Origin</span>
+          <span class="flow-arrow">►</span>
+          <span class="flow-node active">Core PDA</span>
+          <span class="flow-arrow">►</span>
+          <span class="flow-node" id="flow-hops-label">3 Relays</span>
+          <span class="flow-arrow">►</span>
+          <span class="flow-node active">Dest A+B</span>
+        </div>
+
+        <!-- MultiHopper Programs Verified -->
+        <div class="field-group">
+          <label>ON-CHAIN PROTOCOL GUARDS</label>
+          <div class="programs-tree">
+            <div>• Core Program: <span class="core">3jLoS2wb...pFh</span></div>
+            <div>• Orchestrator: <span class="core">4TPCmR2u...ruX</span></div>
+            <div>• Transfer Hook: <span class="guard">2JEv3pD6...3r52</span></div>
+            <div>• Authority: <span style="color: var(--cyan);">Permanent Delegate 1:1</span></div>
+          </div>
         </div>
       </div>
 
-      <div class="field-group">
-        <label>TOTAL TRANSFER VALUE</label>
-        <div class="input-wrapper">
-          <input type="number" id="input-amount" value="1000" min="1" step="10">
+      <!-- Replayer Panel (Hidden by default) -->
+      <div id="panel-replayer" style="display: none; flex-direction: column; gap: 12px;">
+        <div class="replayer-panel">
+          <label>SOLANA TX SIGNATURE / ROUTE ID</label>
+          <input type="text" class="tx-hash-input" id="input-tx-signature" placeholder="Paste Solana TX signature...">
+          <div class="replayer-actions">
+            <button class="btn-sample" id="btn-sample-tx">Load Sample</button>
+            <button class="btn-replay-run" id="btn-replay-run">Decompile & Replay</button>
+          </div>
         </div>
-      </div>
-
-      <!-- Hops Count Stepper Slider -->
-      <div class="hops-control">
-        <div class="slider-header">
-          <span style="color: var(--text-muted); font-weight: 700;">HOPS SEQUENCING</span>
-          <span id="hops-label" style="color: var(--mh-lime); font-weight: 700; font-family: var(--font-mono);">3 Hops (Staggered 30s)</span>
-        </div>
-        <input type="range" id="slider-hops" min="1" max="5" value="3">
-      </div>
-
-      <!-- Route Sequence Flow Visualization -->
-      <div class="route-sequence-flow">
-        <span class="flow-node active">Origin</span>
-        <span class="flow-arrow">►</span>
-        <span class="flow-node active">Core PDA</span>
-        <span class="flow-arrow">►</span>
-        <span class="flow-node" id="flow-hops-label">3 Relays</span>
-        <span class="flow-arrow">►</span>
-        <span class="flow-node active">Dest A+B</span>
-      </div>
-
-      <!-- MultiHopper Programs Verified -->
-      <div class="field-group">
-        <label>ON-CHAIN PROTOCOL GUARDS</label>
         <div class="programs-tree">
-          <div>• Core Program: <span class="core">3jLoS2wb...pFh</span></div>
-          <div>• Orchestrator: <span class="core">4TPCmR2u...ruX</span></div>
-          <div>• Transfer Hook: <span class="guard">2JEv3pD6...3r52</span></div>
-          <div>• Authority: <span style="color: var(--cyan);">Permanent Delegate 1:1</span></div>
+          <div>Trace Status: <span style="color: var(--mh-lime);">Hook Active</span></div>
+          <div>Indexed Vaults: <span style="color: #fff;">18,420 Active PDA</span></div>
         </div>
       </div>
     </div>
 
-    <!-- Replayer Panel (Hidden by default) -->
-    <div id="panel-replayer" style="display: none; flex-direction: column; gap: 12px;">
-      <div class="replayer-panel">
-        <label>SOLANA TX SIGNATURE / ROUTE ID</label>
-        <input type="text" class="tx-hash-input" id="input-tx-signature" placeholder="Paste Solana TX signature...">
-        <div class="replayer-actions">
-          <button class="btn-sample" id="btn-sample-tx">Load Sample</button>
-          <button class="btn-replay-run" id="btn-replay-run">Decompile & Replay</button>
-        </div>
+    <!-- DOCKED STICKY FOOTER (ALWAYS VISIBLE, NEVER CUT OFF) -->
+    <div class="sidebar-footer">
+      <div class="btn-group" style="margin-top: 0; padding-top: 0;">
+        <button class="btn-secondary" id="btn-simulate">SIMULATE</button>
+        <button class="btn-primary" id="btn-deploy">DEPLOY ROUTE</button>
       </div>
-      <div class="programs-tree">
-        <div>Trace Status: <span style="color: var(--mh-lime);">Hook Active</span></div>
-        <div>Indexed Vaults: <span style="color: #fff;">18,420 Active PDA</span></div>
-      </div>
-    </div>
-
-    <!-- Primary Action Buttons -->
-    <div class="btn-group">
-      <button class="btn-secondary" id="btn-simulate">SIMULATE</button>
-      <button class="btn-primary" id="btn-deploy">DEPLOY ROUTE</button>
-    </div>
-
-    <!-- Mobile-nested AI Dispatcher -->
-    <div class="ai-dispatcher" id="ai-dispatcher-bar">
-      <div class="ai-icon">AI</div>
-      <input type="text" class="ai-input" id="ai-prompt-input" placeholder="Prompt: 'Split 500 USDC into 3 hops with 15s delays'">
-      <button class="btn-dispatch" id="btn-ai-dispatch">
-        <span>DISPATCH</span>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-      </button>
     </div>
   </aside>
+
+  <!-- Mobile-nested / Floating AI Dispatcher -->
+  <div class="ai-dispatcher" id="ai-dispatcher-bar">
+    <div class="ai-icon">AI</div>
+    <input type="text" class="ai-input" id="ai-prompt-input" placeholder="Prompt: 'Split 500 USDC into 3 hops with 15s delays'">
+    <button class="btn-dispatch" id="btn-ai-dispatch">
+      <span>DISPATCH</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
 
   <!-- Live Telemetry Monitor -->
   <div class="telemetry-hud">
